@@ -21,3 +21,6 @@ sample_snapshot.json
 totals_per_day.json
 BOT- DF.json
 .DS_Store
+
+.vercel
+.env*
