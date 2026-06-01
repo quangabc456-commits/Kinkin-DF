@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.prod
+*.db
+*.sqlite
+*.sqlite3
+.idea/
+.vscode/
+.vercel/
+.agents/
+node_modules/
+package-lock.json
+skills-lock.json
+scripts/deploy-step-by-step.ps1
+scripts/*-private.*
+sheets_index.json
+sample_snapshot.json
+totals_per_day.json
+BOT- DF.json
+.DS_Store

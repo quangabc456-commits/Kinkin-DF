@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.vscode/
+.idea/
+docker-compose.yml
+sheets_index.json
+sample_snapshot.json
+totals_per_day.json
+logo and favicon/
+.agents/
+*.md
+api-endpoints.md
+BOT- DF.json
+.env
+.env.example

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Cài đặt — KIN KIN PGH{% endblock %}
+{% block content %}
+
+{% if request.query_params.get('sync') == 'queued' %}
+  <div class="card" style="border-color: var(--kk-success); background: var(--kk-success-bg);">
+    <strong style="color: var(--kk-success);">✓ Đã kích hoạt sync toàn bộ</strong>
+    <span class="muted" style="margin-left:.5rem;">Quá trình chạy nền, refresh trang để xem log mới.</span>
+  </div>
+{% endif %}
+<h1 style="margin: 0 0 1rem; font-size: 22px; letter-spacing: -.02em;">Cài đặt</h1>
+
+<!-- BOT INFO -->
+<div class="card">
+  <div class="card-title">🤖 Tài khoản Bot Google</div>
+  <p class="muted" style="margin-top: 0;">
+    Đây là email service account của bot. <strong>Phải share quyền truy cập (Editor/Viewer) cho email này</strong> trên mỗi Google Sheet muốn import dữ liệu.
+  </p>
+  {% if bot.ok %}
+    <div class="row" style="margin-top:.5rem;">
+      <div style="flex: 1;">
+        <label>Email bot (copy & share)</label>
+        <input id="bot-email" type="text" readonly value="{{ bot.email }}" style="width: 100%; font-family: ui-monospace, monospace; font-size: 13px;">
+      </div>
+      <div style="align-self: flex-end;">
+        <button class="btn" type="button" onclick="copyVal('bot-email', this)">Copy email</button>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:.5rem; font-size: 12px;">
+      Project: <code>{{ bot.project }}</code>
+    </div>
+  {% else %}
+    <div style="background: var(--kk-error-bg); color: var(--kk-error); padding:.5rem .75rem; border-radius: var(--kk-radius-sm);">
+      Không đọc được file credentials: {{ bot.loi }}
+    </div>
+  {% endif %}
+</div>
+
+<!-- SHEET CONFIG -->
+<div class="card">
+  <div class="card-title">📑 Google Sheet nguồn</div>
+  <form method="post" action="/cau-hinh/sheet">
+    <div style="display: flex; flex-direction: column; gap: .35rem; margin-bottom: .85rem;">
+      <label for="sheet_input">Link Google Sheet hoặc Spreadsheet ID</label>
+      <input id="sheet_input" name="sheet_input" type="text"
+             placeholder="https://docs.google.com/spreadsheets/d/XXXX/edit hoặc dán trực tiếp ID"
+             value="{{ sheet_id }}"
+             style="width: 100%;">
+      <span class="muted" style="font-size: 12px;">
+        Hệ thống tự tách ID từ URL. Sheet phải có các worksheet tên dạng <code>dd-mm-yy</code> (vd: <code>25-05-26</code>) đúng template chuẩn.
+      </span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: .35rem; margin-bottom: .85rem;">
+      <label for="webhook_base">Webhook Base URL (cho Apps Script gọi về)</label>
+      <input id="webhook_base" name="webhook_base" type="text"
+             placeholder="https://abc.ngrok.io  (để trống nếu test local cùng máy)"
+             value="{{ webhook_base_url }}"
+             style="width: 100%;">
+      <span class="muted" style="font-size: 12px;">
+        Để Google gọi được vào app, URL phải public HTTPS (ngrok / cloudflared / domain thật). Local <code>127.0.0.1</code> Google không truy cập được.
+      </span>
+    </div>
+
+    <div class="row">
+      <button class="btn" type="submit">Lưu cấu hình</button>
+      {% if sheet_url_hien_tai %}
+        <a class="btn ghost sm" href="{{ sheet_url_hien_tai }}" target="_blank" rel="noopener">Mở sheet hiện tại ↗</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- APPS SCRIPT -->
+<div class="card">
+  <div class="card-title">⚡ Apps Script (dán vào Sheet để bật webhook tự động)</div>
+  <p class="muted" style="margin-top: 0;">
+    Webhook URL: <code>{{ webhook_url }}</code><br>
+    Secret: <code style="font-size: 11px;">{{ webhook_secret }}</code>
+    <form method="post" action="/cau-hinh/rotate-secret" style="display: inline-block; margin-left: .5rem;">
+      <button class="btn ghost sm" type="submit" onclick="return confirm('Tạo secret mới? Sau đó phải dán lại Apps Script vào sheet.')">↻ Đổi secret</button>
+    </form>
+  </p>
+
+  <div class="row" style="margin-bottom: .5rem;">
+    <button class="btn" type="button" onclick="copyTextarea('apps-script', this)">Copy toàn bộ Apps Script</button>
+    <span class="muted" style="font-size: 12px;">
+      Cách dùng: Mở sheet → menu <strong>Extensions</strong> → <strong>Apps Script</strong> → Paste → Save → Run <code>setupTrigger</code> (cấp quyền).
+    </span>
+  </div>
+
+  <textarea id="apps-script" readonly spellcheck="false" rows="20" style="width: 100%; font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace; font-size: 12px; line-height: 1.45; resize: vertical; background: #1a1a1a; color: #f5f5f5; border: 1px solid #2a2a2a; padding: .8rem 1rem; border-radius: var(--kk-radius-sm);">{{ apps_script }}</textarea>
+</div>
+
+{% if enable_sync_ui %}
+<!-- SYNC ACTION -->
+<div class="card">
+  <div class="card-title">🔄 Kéo toàn bộ dữ liệu</div>
+  <p class="muted" style="margin-top: 0;">
+    Bấm nút này khi đổi sheet nguồn hoặc muốn refresh hết. Hệ thống quét mọi worksheet dạng <code>dd-mm-yy</code> và upsert vào DB. Chạy nền, có thể mất 3-10 phút tuỳ số sheet.
+  </p>
+  <form method="post" action="/cau-hinh/sync">
+    <button class="btn" type="submit" onclick="return confirm('Kéo toàn bộ data từ Google Sheet về DB? Có thể mất vài phút.')">Sync toàn bộ ngay</button>
+  </form>
+</div>
+{% else %}
+<div class="card" style="border-color: var(--kk-warn); background: var(--kk-warn-bg);">
+  <div class="card-title" style="color: var(--kk-warn);">⏸ Sync API tạm dừng</div>
+  <p class="muted" style="margin-top: 0;">
+    Sync sheet đang tắt trên môi trường này (<code>ENABLE_SYNC_UI=false</code>). Nếu cần backfill data, chạy từ máy local: <code>python -m app.cli.sync --all</code> với <code>DATABASE_URL</code> trỏ vào DB sản xuất.
+  </p>
+</div>
+{% endif %}
+
+<!-- KINKIN STATUS (read-only, config hardcoded trong .env) -->
+<div class="card">
+  <div class="card-title">🔐 Kết nối API Kinkin <span class="badge {% if kinkin_status.co_creds %}ok{% else %}err{% endif %} dot" style="margin-left:.4rem;">{% if kinkin_status.co_creds %}Đã cấu hình{% else %}Chưa cấu hình{% endif %}</span></div>
+  <p class="muted" style="margin-top: 0;">
+    Credentials được nhúng cứng trong file <code>.env</code> (không hiển thị / không sửa được từ UI). Token JWT cache trong memory ~50 phút, tự refresh khi hết hạn.
+  </p>
+
+  {% if kinkin_status.co_creds %}
+    <div style="display:grid; grid-template-columns: max-content 1fr; gap:.35rem .9rem; font-size: 13px; margin-top:.5rem;">
+      <div class="muted">Identity base</div>
+      <div><code>{{ kinkin_status.base_identity }}</code></div>
+
+      <div class="muted">Warehouse base</div>
+      <div><code>{{ kinkin_status.base_warehouse }}</code></div>
+
+      <div class="muted">Username</div>
+      <div><code>{{ kinkin_status.username }}</code></div>
+
+      <div class="muted">Customer code</div>
+      <div><code>{{ kinkin_status.customer_code }}</code></div>
+
+      <div class="muted">Warehouse IDs ({{ kinkin_status.warehouse_ids|length }} kho)</div>
+      <div>
+        {% for wh in kinkin_status.warehouse_ids %}<span class="badge neutral" style="margin-right:.2rem;">{{ wh }}</span>{% endfor %}
+      </div>
+
+      <div class="muted">_apikey (packageK)</div>
+      <div>
+        {% if kinkin_status.co_apikey_k %}<span class="badge ok dot">Có</span>{% else %}<span class="badge warn dot">Chưa</span> — endpoint k_history sẽ skip{% endif %}
+      </div>
+
+      <div class="muted">Token JWT</div>
+      <div>
+        {% if kinkin_status.co_token %}<span class="badge ok dot">Đang cache</span> — hết hạn lúc {{ kinkin_status.het_han_luc[:19] }}{% else %}<span class="badge neutral dot">Chưa lấy</span> — sẽ lấy ở lookup đầu tiên{% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div style="background: var(--kk-error-bg); color: var(--kk-error); padding:.65rem .85rem; border-radius: var(--kk-radius-sm); margin-top:.5rem;">
+      Thiếu <code>KK_USERNAME</code> / <code>KK_PASSWORD</code> trong <code>.env</code>. Bổ sung rồi restart app.
+    </div>
+  {% endif %}
+</div>
+
+<!-- SYNC HISTORY -->
+<div class="card">
+  <div class="card-title">📜 Lịch sử đồng bộ (20 gần nhất)</div>
+  {% if logs %}
+    <div class="table-wrap" style="margin-top: .5rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>Sheet</th>
+            <th class="nowrap">Bắt đầu</th>
+            <th class="nowrap">Kết thúc</th>
+            <th class="nowrap">Đọc</th>
+            <th class="nowrap">Thêm mới</th>
+            <th class="nowrap">Cập nhật</th>
+            <th class="nowrap">Lỗi</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in logs %}
+            <tr>
+              <td><code>{{ l.ten_sheet }}</code></td>
+              <td class="nowrap muted" style="font-size: 12px;">{{ l.bat_dau_luc.strftime('%d/%m %H:%M:%S') if l.bat_dau_luc else '—' }}</td>
+              <td class="nowrap muted" style="font-size: 12px;">{{ l.ket_thuc_luc.strftime('%d/%m %H:%M:%S') if l.ket_thuc_luc else '—' }}</td>
+              <td class="nowrap">{{ l.so_dong_doc }}</td>
+              <td class="nowrap" style="color: var(--kk-success);">{{ l.so_dong_them_moi }}</td>
+              <td class="nowrap">{{ l.so_dong_cap_nhat }}</td>
+              <td class="nowrap">{% if l.so_dong_loi %}<span style="color: var(--kk-error);">{{ l.so_dong_loi }}</span>{% else %}0{% endif %}</td>
+              <td>
+                {% if l.trang_thai == 'thanh_cong' %}<span class="badge ok dot">Thành công</span>
+                {% elif l.trang_thai == 'loi' %}<span class="badge err dot">Lỗi</span>
+                {% else %}<span class="badge warn dot">Đang chạy</span>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted">Chưa có lịch sử sync. Bấm <strong>Sync toàn bộ</strong> hoặc dán Apps Script vào sheet để bắt đầu.</p>
+  {% endif %}
+</div>
+
+<script>
+  function copyVal(id, btn) {
+    const el = document.getElementById(id);
+    el.select();
+    navigator.clipboard.writeText(el.value).then(() => flashBtn(btn, 'Đã copy ✓'));
+  }
+  function copyTextarea(id, btn) {
+    const el = document.getElementById(id);
+    navigator.clipboard.writeText(el.value).then(() => flashBtn(btn, 'Đã copy ✓'));
+  }
+  function flashBtn(btn, msg) {
+    const old = btn.textContent;
+    btn.textContent = msg;
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 1500);
+  }
+</script>
+
+{% endblock %}

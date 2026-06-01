@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% block title %}Vận đơn Viettel — KIN KIN PGH{% endblock %}
+{% block content %}
+
+{% set total = rows|length %}
+{% set so_da_chot = pgh_map.values()|selectattr('ma_pgh_vtp')|list|length %}
+{% set so_loi = pgh_map.values()|selectattr('trang_thai_pgh','equalto','loi_api')|list|length %}
+{% set so_cho = total - so_da_chot - so_loi %}
+
+<div class="stat-grid">
+  <div class="stat">
+    <div class="label">Tổng vận đơn Viettel</div>
+    <div class="value">{{ total }}</div>
+    <div class="sub">trong trang hiện tại</div>
+  </div>
+  <div class="stat">
+    <div class="label">Chờ chốt PGH</div>
+    <div class="value" style="color:var(--kk-red);">{{ so_cho }}</div>
+    <div class="sub">cần xử lý</div>
+  </div>
+  <div class="stat">
+    <div class="label">Đã chốt</div>
+    <div class="value" style="color:var(--kk-success);">{{ so_da_chot }}</div>
+    <div class="sub">PGH gửi VTP thành công</div>
+  </div>
+  <div class="stat">
+    <div class="label">Lỗi API</div>
+    <div class="value" style="color:var(--kk-error);">{{ so_loi }}</div>
+    <div class="sub">cần xem lại</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" class="row" style="gap:.6rem">
+    <div style="display:flex; flex-direction:column; gap:.2rem;">
+      <label for="q">Tìm kiếm</label>
+      <input id="q" name="q" type="search" placeholder="Tên KH / mã vận đơn / kiện K..." value="{{ q }}" style="width: 320px">
+    </div>
+    <div style="display:flex; flex-direction:column; gap:.2rem;">
+      <label for="ngay">Ngày chốt đơn</label>
+      <select id="ngay" name="ngay">
+        <option value="">— Tất cả ngày —</option>
+        {% for d, c, ng in days %}
+          <option value="{{ d }}" {% if d == ngay %}selected{% endif %}>{{ d }} · {{ c }} dòng</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="align-self:flex-end;">
+      <button class="btn" type="submit">Lọc</button>
+      {% if q or ngay %}
+        <a class="btn ghost sm" href="/" style="margin-left:.4rem;">Xoá lọc</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Ngày</th>
+        <th title="Click mã để xem chi tiết Kinkin">K</th>
+        <th title="Click mã để xem chi tiết Kinkin">F cha</th>
+        <th title="Click mã để xem chi tiết Kinkin">Thùng (F con)</th>
+        <th title="Click mã để xem chi tiết Kinkin">Mã vận đơn</th>
+        <th>Khách hàng</th>
+        <th>SĐT</th>
+        <th>Địa chỉ</th>
+        <th class="nowrap">Cân (kg)</th>
+        <th>Trạng thái PGH</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        {% set p = pgh_map.get(r.id) %}
+        <tr>
+          <td class="nowrap"><span class="muted">{{ r.ten_sheet }}</span></td>
+          <td class="nowrap">{% if r.ma_kien_k %}<button type="button" class="code-btn" data-code="{{ r.ma_kien_k }}">{{ r.ma_kien_k }}</button>{% else %}—{% endif %}</td>
+          <td class="nowrap">{% if r.ma_f_cha %}<button type="button" class="code-btn" data-code="{{ r.ma_f_cha }}">{{ r.ma_f_cha }}</button>{% else %}—{% endif %}</td>
+          <td class="nowrap">{% if r.ma_thung %}<button type="button" class="code-btn" data-code="{{ r.ma_thung }}">{{ r.ma_thung }}</button>{% else %}—{% endif %}</td>
+          <td class="nowrap"><button type="button" class="code-btn code-btn--mono" data-code="{{ r.ma_van_don }}">{{ r.ma_van_don }}</button></td>
+          <td>{{ r.ten_kh or '—' }}</td>
+          <td class="nowrap">{{ r.sdt_nguoi_nhan or '—' }}</td>
+          <td><div class="addr" title="{{ r.dia_chi_nguoi_nhan or '' }}">{{ r.dia_chi_nguoi_nhan or '—' }}</div></td>
+          <td class="nowrap">{{ r.can_nang_kg or '—' }}</td>
+          <td>
+            {% if p and p.ma_pgh_vtp %}
+              <span class="badge ok dot">Đã chốt</span>
+              <div style="margin-top:.25rem;">
+                <code>{{ p.ma_pgh_vtp }}</code>
+                <a href="/pgh/{{ p.id }}" style="margin-left:.4rem;">Chi tiết</a>
+              </div>
+            {% elif p and p.trang_thai_pgh == 'loi_api' %}
+              <span class="badge err dot" title="{{ p.loi_message }}">Lỗi API</span>
+              <div style="margin-top:.25rem;"><a href="/pgh/{{ p.id }}">Xem lỗi</a></div>
+            {% else %}
+              <span class="badge neutral dot">Chờ chốt</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not (p and p.ma_pgh_vtp) %}
+              <form method="post" action="/chot/{{ r.id }}" onsubmit="return confirm('Chốt PGH cho vận đơn {{ r.ma_van_don }}?')">
+                {% if tai_khoans|length > 1 %}
+                  <select name="tai_khoan_vtp_id" class="sm">
+                    {% for tk in tai_khoans %}
+                      <option value="{{ tk.id }}" {% if tk.mac_dinh %}selected{% endif %}>{{ tk.ten_hien_thi }}</option>
+                    {% endfor %}
+                  </select>
+                {% endif %}
+                <button class="btn sm" type="submit">Chốt PGH</button>
+              </form>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="11" style="text-align:center; padding: 2.5rem 1rem;">
+          <div class="muted" style="font-size:14px;">Không có vận đơn Viettel nào khớp bộ lọc.</div>
+          <div class="muted" style="font-size:12.5px; margin-top:.3rem;">Thử bỏ lọc hoặc sync sheet mới bằng <code>python -m app.cli.sync --sheet &lt;dd-mm-yy&gt;</code>.</div>
+        </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- MODAL KINKIN LOOKUP -->
+<div id="kk-modal" class="kk-modal" aria-hidden="true">
+  <div class="kk-modal__backdrop" data-modal-close></div>
+  <div class="kk-modal__panel" role="dialog" aria-modal="true" aria-labelledby="kk-modal-title">
+    <header class="kk-modal__head">
+      <div>
+        <div class="kk-modal__eyebrow" id="kk-modal-eyebrow">Tra cứu Kinkin</div>
+        <h2 class="kk-modal__title" id="kk-modal-title">…</h2>
+      </div>
+      <button type="button" class="kk-modal__close" data-modal-close aria-label="Đóng">×</button>
+    </header>
+    <div class="kk-modal__body" id="kk-modal-body">
+      <div class="muted" style="text-align:center; padding:2rem 0;">Đang tải…</div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .code-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--kk-red);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    line-height: 1.3;
+    transition: background .1s ease, border-color .1s ease;
+  }
+  .code-btn:hover { background: var(--kk-red-50); border-color: var(--kk-red-200); }
+  .code-btn:active { transform: translateY(1px); }
+  .code-btn--mono { font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; font-size: 12px; }
+
+  .kk-modal { position: fixed; inset: 0; z-index: 100; display: none; }
+  .kk-modal.open { display: block; }
+  .kk-modal__backdrop {
+    position: absolute; inset: 0;
+    background: rgba(20, 20, 30, .55);
+    backdrop-filter: blur(2px);
+    animation: kk-fade-in .15s ease;
+  }
+  .kk-modal__panel {
+    position: absolute; top: 5vh; left: 50%; transform: translateX(-50%);
+    width: min(960px, 92vw); max-height: 90vh;
+    background: var(--kk-paper);
+    border-radius: var(--kk-radius);
+    box-shadow: 0 30px 80px rgba(0,0,0,.3), 0 0 0 1px var(--kk-line);
+    display: flex; flex-direction: column;
+    animation: kk-pop-in .18s cubic-bezier(.16,1,.3,1);
+  }
+  .kk-modal__head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid var(--kk-line);
+  }
+  .kk-modal__eyebrow {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--kk-muted); font-weight: 600;
+  }
+  .kk-modal__title {
+    margin: .15rem 0 0;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+    font-size: 18px; letter-spacing: -.01em;
+    color: var(--kk-ink);
+  }
+  .kk-modal__close {
+    background: transparent; border: 0;
+    font-size: 28px; line-height: 1; cursor: pointer;
+    width: 36px; height: 36px; border-radius: var(--kk-radius-sm);
+    color: var(--kk-muted);
+    transition: background .1s ease, color .1s ease;
+  }
+  .kk-modal__close:hover { background: var(--kk-red-50); color: var(--kk-red); }
+  .kk-modal__body {
+    padding: 1.1rem 1.25rem 1.5rem;
+    overflow: auto;
+  }
+  .kk-section { margin-bottom: 1.2rem; }
+  .kk-section__head {
+    display: flex; align-items: center; gap: .5rem;
+    margin-bottom: .5rem;
+  }
+  .kk-section__title { font-size: 13px; font-weight: 600; color: var(--kk-ink-soft); margin: 0; }
+  .kk-section__pill {
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+    padding: 2px 7px; border-radius: var(--kk-radius-pill);
+    background: var(--kk-line-soft); color: var(--kk-muted);
+  }
+  .kk-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem .85rem;
+    background: var(--kk-line-soft);
+    padding: .8rem 1rem;
+    border-radius: var(--kk-radius-sm);
+    border: 1px solid var(--kk-line);
+  }
+  .kk-grid > div > label { display: block; font-size: 11px; color: var(--kk-muted); margin-bottom: 2px; font-weight: 600; }
+  .kk-grid > div > span { font-size: 13px; color: var(--kk-ink); word-break: break-word; }
+  .kk-json {
+    background: #1a1a1a; color: #f5f5f5;
+    border: 1px solid #2a2a2a;
+    border-radius: var(--kk-radius-sm);
+    padding: .85rem 1rem;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+    font-size: 11.5px; line-height: 1.5;
+    overflow: auto;
+    max-height: 400px;
+  }
+  .kk-err {
+    background: var(--kk-error-bg); color: var(--kk-error);
+    padding: .7rem .9rem; border-radius: var(--kk-radius-sm);
+    font-size: 13px;
+  }
+
+  @keyframes kk-fade-in { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes kk-pop-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+</style>
+
+<script>
+(function () {
+  const modal = document.getElementById('kk-modal');
+  const body  = document.getElementById('kk-modal-body');
+  const title = document.getElementById('kk-modal-title');
+  const eyebrow = document.getElementById('kk-modal-eyebrow');
+
+  function openModal(code) {
+    title.textContent = code;
+    eyebrow.textContent = 'Đang tra cứu…';
+    body.innerHTML = '<div class="muted" style="text-align:center; padding:2rem 0;">⏳ Đang gọi Kinkin API…</div>';
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    fetch('/api/kinkin/lookup/' + encodeURIComponent(code))
+      .then(r => r.json())
+      .then(data => render(data))
+      .catch(err => {
+        body.innerHTML = '<div class="kk-err">Lỗi gọi API: ' + escapeHtml(err.message || String(err)) + '</div>';
+      });
+  }
+
+  function closeModal() {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function fld(label, value) {
+    return '<div><label>' + escapeHtml(label) + '</label><span>' + (value == null || value === '' ? '<span class="muted">—</span>' : escapeHtml(value)) + '</span></div>';
+  }
+
+  function render(data) {
+    eyebrow.textContent = 'Loại mã: ' + (data.loai || 'unknown');
+    const parts = [];
+
+    if (data.local) {
+      const l = data.local;
+      parts.push('<section class="kk-section">'
+        + '<div class="kk-section__head"><h3 class="kk-section__title">📑 Dữ liệu local (du_lieu_sheet)</h3>'
+        + '<span class="kk-section__pill">' + escapeHtml(l.ten_sheet) + '</span></div>'
+        + '<div class="kk-grid">'
+        + fld('Mã kiện K', l.ma_kien_k)
+        + fld('Mã F cha', l.ma_f_cha)
+        + fld('Mã thùng (F con)', l.ma_thung)
+        + fld('Mã vận đơn', l.ma_van_don)
+        + fld('Khách hàng', l.ten_kh)
+        + fld('SĐT người nhận', l.sdt_nguoi_nhan)
+        + fld('Địa chỉ', l.dia_chi_nguoi_nhan)
+        + fld('Nhóm sản phẩm', l.nhom_san_pham)
+        + fld('Phương thức gửi', l.phuong_thuc_gui)
+        + fld('Cân nặng (kg)', l.can_nang_kg)
+        + fld('Ngày chốt', l.ngay_chot)
+        + fld('Trạng thái gốc', l.trang_thai_goc)
+        + '</div></section>');
+    } else {
+      parts.push('<section class="kk-section"><div class="muted">Không tìm thấy mã này trong dữ liệu local.</div></section>');
+    }
+
+    if (data.loi) {
+      parts.push('<div class="kk-err">⚠ ' + escapeHtml(data.loi) + '</div>');
+    }
+
+    if (data.kinkin) {
+      parts.push('<section class="kk-section">'
+        + '<div class="kk-section__head"><h3 class="kk-section__title">🔗 Phản hồi từ Kinkin API</h3>'
+        + '<span class="kk-section__pill">live</span></div>'
+        + '<pre class="kk-json">' + escapeHtml(JSON.stringify(data.kinkin, null, 2)) + '</pre>'
+        + '</section>');
+    }
+
+    body.innerHTML = parts.join('');
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.code-btn');
+    if (btn) {
+      const code = btn.getAttribute('data-code');
+      if (code) openModal(code);
+      return;
+    }
+    if (e.target.matches('[data-modal-close]')) closeModal();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+  });
+})();
+</script>
+
+{% endblock %}

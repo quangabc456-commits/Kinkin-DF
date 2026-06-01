@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Kinkin Logistics — Quản lý PGH{% endblock %}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" type="image/jpeg" href="/static/favicon.jpg">
+  <link rel="shortcut icon" type="image/jpeg" href="/static/favicon.jpg">
+  <link rel="preconnect" href="https://rsms.me/">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <style>
+    :root {
+      --kk-red: #d2232a;
+      --kk-red-deep: #a8181f;
+      --kk-red-bright: #ef3a41;
+      --kk-red-50: #fff4f4;
+      --kk-red-100: #ffe1e2;
+      --kk-red-200: #ffc4c6;
+      --kk-ink: #1a1a1a;
+      --kk-ink-soft: #2a2a2a;
+      --kk-muted: #6b7280;
+      --kk-line: #ececec;
+      --kk-line-soft: #f3f3f3;
+      --kk-paper: #ffffff;
+      --kk-canvas: #fafafa;
+      --kk-success: #0f7a3a;
+      --kk-success-bg: #e7f5ec;
+      --kk-warn: #b35900;
+      --kk-warn-bg: #fff3e0;
+      --kk-error: #b91c1c;
+      --kk-error-bg: #fdeaea;
+      --kk-radius: 8px;
+      --kk-radius-sm: 6px;
+      --kk-radius-pill: 999px;
+      --kk-shadow-sm: 0 1px 2px rgba(20, 20, 30, .04);
+      --kk-shadow-md: 0 4px 14px rgba(210, 35, 42, .08);
+      --kk-shadow-pop: 0 8px 28px rgba(210, 35, 42, .15);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-feature-settings: "cv11", "ss01", "ss03";
+      background: var(--kk-canvas);
+      color: var(--kk-ink);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--kk-red); text-decoration: none; }
+    a:hover { color: var(--kk-red-deep); text-decoration: underline; }
+    code, pre { font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
+
+    /* TOP BAR */
+    header.topbar {
+      background: var(--kk-paper);
+      border-bottom: 1px solid var(--kk-line);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-inner {
+      max-width: 1480px; margin: 0 auto;
+      display: flex; align-items: center; gap: 1.25rem;
+      padding: .65rem 1.25rem;
+    }
+    .gear-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px;
+      border-radius: var(--kk-radius-sm);
+      color: var(--kk-ink-soft);
+      text-decoration: none;
+      transition: background .12s ease, color .12s ease, transform .25s ease;
+      flex-shrink: 0;
+    }
+    .gear-btn:hover { background: var(--kk-red-50); color: var(--kk-red); text-decoration: none; }
+    .gear-btn:hover svg { transform: rotate(45deg); }
+    .gear-btn.active { background: var(--kk-red); color: white; }
+    .gear-btn.active:hover { background: var(--kk-red-deep); color: white; }
+    .gear-btn svg { transition: transform .25s ease; }
+    .brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+    .brand img { height: 36px; width: auto; display: block; }
+    .brand-divider { width: 1px; height: 24px; background: var(--kk-line); }
+    .brand-title { font-weight: 600; font-size: 14.5px; letter-spacing: -.01em; color: var(--kk-ink); }
+    .brand-sub { font-size: 12px; color: var(--kk-muted); margin-top: 1px; }
+    nav.topnav { display: flex; gap: .25rem; margin-left: auto; align-items: center; }
+    nav.topnav a {
+      color: var(--kk-ink-soft);
+      padding: .45rem .75rem;
+      border-radius: var(--kk-radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .12s ease, color .12s ease;
+    }
+    nav.topnav a:hover { background: var(--kk-red-50); color: var(--kk-red); text-decoration: none; }
+    nav.topnav a.active { background: var(--kk-red); color: white; }
+    nav.topnav a.active:hover { background: var(--kk-red-deep); color: white; }
+
+    /* PAGE WRAP */
+    main.page {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 3rem;
+    }
+
+    /* CARD */
+    .card {
+      background: var(--kk-paper);
+      border: 1px solid var(--kk-line);
+      border-radius: var(--kk-radius);
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--kk-shadow-sm);
+    }
+    .card.compact { padding: .75rem 1rem; }
+    .card-title { font-weight: 600; font-size: 15px; letter-spacing: -.01em; margin: 0 0 .65rem; }
+    .row { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; }
+    .row.between { justify-content: space-between; }
+    .muted { color: var(--kk-muted); font-size: 13px; }
+
+    /* TABLE */
+    .table-wrap {
+      background: var(--kk-paper);
+      border: 1px solid var(--kk-line);
+      border-radius: var(--kk-radius);
+      overflow: auto;
+      box-shadow: var(--kk-shadow-sm);
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    thead th {
+      background: var(--kk-line-soft);
+      color: var(--kk-ink-soft);
+      text-align: left;
+      font-weight: 600;
+      padding: .65rem .75rem;
+      border-bottom: 1px solid var(--kk-line);
+      position: sticky; top: 0;
+      white-space: nowrap;
+      font-size: 12.5px;
+      letter-spacing: .01em;
+    }
+    tbody td {
+      padding: .6rem .75rem;
+      border-bottom: 1px solid var(--kk-line-soft);
+      vertical-align: top;
+    }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: var(--kk-red-50); }
+    td .nowrap { white-space: nowrap; }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--kk-red);
+      color: #fff;
+      border: 1px solid var(--kk-red);
+      padding: .45rem .85rem;
+      border-radius: var(--kk-radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      line-height: 1;
+      transition: background .12s ease, transform .06s ease, box-shadow .12s ease;
+      text-decoration: none;
+    }
+    .btn:hover { background: var(--kk-red-deep); border-color: var(--kk-red-deep); color: #fff; text-decoration: none; box-shadow: var(--kk-shadow-md); }
+    .btn:active { transform: translateY(1px); box-shadow: none; }
+    .btn:disabled { background: var(--kk-line); border-color: var(--kk-line); color: var(--kk-muted); cursor: not-allowed; }
+    .btn.ghost {
+      background: transparent; color: var(--kk-red); border-color: var(--kk-red-200);
+    }
+    .btn.ghost:hover { background: var(--kk-red-50); color: var(--kk-red-deep); border-color: var(--kk-red); }
+    .btn.sm { padding: .3rem .6rem; font-size: 12.5px; }
+
+    /* INPUTS */
+    input[type="text"], input[type="search"], input:not([type]), select, textarea {
+      background: var(--kk-paper);
+      color: var(--kk-ink);
+      border: 1px solid var(--kk-line);
+      border-radius: var(--kk-radius-sm);
+      padding: .45rem .65rem;
+      font-size: 13.5px;
+      font-family: inherit;
+      transition: border-color .12s ease, box-shadow .12s ease;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--kk-red);
+      box-shadow: 0 0 0 3px rgba(210, 35, 42, .12);
+    }
+    select { padding-right: 1.75rem; }
+    label { font-size: 12.5px; color: var(--kk-muted); font-weight: 500; }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex; align-items: center; gap: .3rem;
+      font-size: 11.5px; font-weight: 600;
+      padding: 2px 8px;
+      border-radius: var(--kk-radius-pill);
+      letter-spacing: .01em;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .badge.viettel { background: var(--kk-red-100); color: var(--kk-red-deep); border: 1px solid var(--kk-red-200); }
+    .badge.ok { background: var(--kk-success-bg); color: var(--kk-success); }
+    .badge.err { background: var(--kk-error-bg); color: var(--kk-error); }
+    .badge.warn { background: var(--kk-warn-bg); color: var(--kk-warn); }
+    .badge.neutral { background: var(--kk-line-soft); color: var(--kk-ink-soft); }
+    .badge.dot::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .9;
+    }
+
+    /* STAT GRID (hero stats) */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
+    @media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat {
+      background: var(--kk-paper);
+      border: 1px solid var(--kk-line);
+      border-radius: var(--kk-radius);
+      padding: .9rem 1rem;
+      box-shadow: var(--kk-shadow-sm);
+      position: relative; overflow: hidden;
+    }
+    .stat::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--kk-red);
+    }
+    .stat .label { font-size: 11.5px; color: var(--kk-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .stat .value { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin-top: .15rem; color: var(--kk-ink); }
+    .stat .sub { font-size: 11.5px; color: var(--kk-muted); margin-top: .15rem; }
+
+    /* PRE block */
+    pre {
+      background: var(--kk-line-soft);
+      border: 1px solid var(--kk-line);
+      padding: .85rem 1rem;
+      border-radius: var(--kk-radius-sm);
+      overflow: auto;
+      line-height: 1.55;
+      color: var(--kk-ink-soft);
+    }
+
+    /* ADDRESS truncation in table */
+    .addr {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: 280px;
+      color: var(--kk-ink-soft);
+    }
+
+    /* INLINE form in table */
+    td form { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin: 0; }
+
+    /* FOCUS RING utility */
+    :focus-visible { outline: 2px solid var(--kk-red); outline-offset: 2px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" style="text-decoration:none;">
+        <img src="/static/logo-kinkin.png" alt="KIN KIN Logistics">
+        <span class="brand-divider"></span>
+        <div>
+          <div class="brand-title">Quản lý phiếu giao hàng</div>
+          <div class="brand-sub">Tích hợp ViettelPost • 450HN-GENKIN</div>
+        </div>
+      </a>
+      <nav class="topnav">
+        <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Vận đơn</a>
+      </nav>
+      <a class="gear-btn {% if request.url.path.startswith('/cau-hinh') %}active{% endif %}" href="/cau-hinh/" title="Cài đặt — cấu hình sheet, bot, Apps Script">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </a>
+    </div>
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
