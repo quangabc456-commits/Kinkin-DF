@@ -15,12 +15,14 @@ node_modules/
 package-lock.json
 skills-lock.json
 scripts/deploy-step-by-step.ps1
+scripts/migrate-supabase.py
 scripts/*-private.*
 sheets_index.json
 sample_snapshot.json
 totals_per_day.json
 BOT- DF.json
 .DS_Store
+log*.txt
 
 .vercel
 .env*
