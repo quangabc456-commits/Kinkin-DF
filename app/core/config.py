@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     CRON_WORKER_REFRESH_DAYS: int = 7
     CRON_WORKER_DRY_RUN: bool = False
 
+    DEFAULT_KHO_DEN_ID: str = "5"
+    MIN_DIA_CHI_LEN: int = 15
+
     @property
     def kk_warehouse_ids(self) -> list[str]:
         return [s.strip() for s in self.KK_WAREHOUSE_IDS.split(",") if s.strip()]

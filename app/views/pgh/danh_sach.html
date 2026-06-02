@@ -67,7 +67,8 @@
         <th>SĐT</th>
         <th>Địa chỉ</th>
         <th class="nowrap">Cân (kg)</th>
-        <th>Trạng thái PGH</th>
+        <th>Trạng thái VTP</th>
+        <th>PGH kho Kinkin</th>
         <th>Hành động</th>
       </tr>
     </thead>
@@ -91,6 +92,9 @@
                 <code>{{ p.ma_pgh_vtp }}</code>
                 <a href="/pgh/{{ p.id }}" style="margin-left:.4rem;">Chi tiết</a>
               </div>
+            {% elif p and p.trang_thai_pgh == 'cho_dien_thong_tin' %}
+              <span class="badge warn dot" title="Thiếu: {{ p.thieu_truong_json|join(', ') if p.thieu_truong_json else '' }}">Thiếu thông tin</span>
+              <div style="margin-top:.25rem;"><a href="/pgh/cho-dien-thong-tin/#row-{{ p.id }}">Điền ngay</a></div>
             {% elif p and p.trang_thai_pgh == 'loi_api' %}
               <span class="badge err dot" title="{{ p.loi_message }}">Lỗi API</span>
               <div style="margin-top:.25rem;"><a href="/pgh/{{ p.id }}">Xem lỗi</a></div>
@@ -99,7 +103,20 @@
             {% endif %}
           </td>
           <td>
-            {% if not (p and p.ma_pgh_vtp) %}
+            {% if p and p.ma_pgh_kinkin %}
+              <span class="badge ok dot">Đã tạo</span>
+              <div style="margin-top:.25rem;"><code>{{ p.ma_pgh_kinkin }}</code></div>
+              {% if p.kho_den_id %}<div class="muted" style="font-size:11px;">kho {{ p.kho_den_id }}</div>{% endif %}
+            {% elif p and p.trang_thai_kinkin == 'loi_api_kinkin' %}
+              <span class="badge err dot" title="{{ p.kinkin_loi_message }}">Lỗi Kinkin</span>
+            {% elif p and p.ma_pgh_vtp %}
+              <span class="badge neutral dot">Chờ tạo</span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not (p and p.ma_pgh_vtp) and not (p and p.trang_thai_pgh == 'cho_dien_thong_tin') %}
               <form method="post" action="/chot/{{ r.id }}" onsubmit="return confirm('Chốt PGH cho vận đơn {{ r.ma_van_don }}?')">
                 {% if tai_khoans|length > 1 %}
                   <select name="tai_khoan_vtp_id" class="sm">
@@ -116,7 +133,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="11" style="text-align:center; padding: 2.5rem 1rem;">
+        <tr><td colspan="12" style="text-align:center; padding: 2.5rem 1rem;">
           <div class="muted" style="font-size:14px;">Không có vận đơn Viettel nào khớp bộ lọc.</div>
           <div class="muted" style="font-size:12.5px; margin-top:.3rem;">Thử bỏ lọc hoặc sync sheet mới bằng <code>python -m app.cli.sync --sheet &lt;dd-mm-yy&gt;</code>.</div>
         </td></tr>

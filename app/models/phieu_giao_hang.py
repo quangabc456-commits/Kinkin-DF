@@ -78,6 +78,17 @@ class PhieuGiaoHang(Base):
     tao_luc: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     sua_luc: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
+    ma_pgh_kinkin: Mapped[Optional[str]] = mapped_column(Text, unique=True)
+    kho_den_id: Mapped[Optional[str]] = mapped_column(Text)
+    trang_thai_kinkin: Mapped[str] = mapped_column(
+        Text, nullable=False, default="chua_tao", server_default="chua_tao"
+    )
+    kinkin_request_json: Mapped[Optional[dict]] = mapped_column(JSONB)
+    kinkin_response_json: Mapped[Optional[dict]] = mapped_column(JSONB)
+    kinkin_loi_message: Mapped[Optional[str]] = mapped_column(Text)
+    kinkin_tao_luc: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    thieu_truong_json: Mapped[Optional[list]] = mapped_column(JSONB)
+
     dong_sheet: Mapped["DuLieuSheet"] = relationship(back_populates="phieu_giao_hang")
     tai_khoan_vtp: Mapped["TaiKhoanVtp"] = relationship(back_populates="phieu_giao_hang")
     hanh_trinh: Mapped[list["HanhTrinhPgh"]] = relationship(back_populates="pgh")
@@ -86,4 +97,5 @@ class PhieuGiaoHang(Base):
         Index("ix_phieu_giao_hang_trang_thai", "trang_thai_pgh"),
         Index("ix_phieu_giao_hang_ma_pgh_vtp", "ma_pgh_vtp"),
         Index("ix_phieu_giao_hang_du_lieu_sheet_id", "du_lieu_sheet_id"),
+        Index("ix_phieu_giao_hang_trang_thai_kinkin", "trang_thai_kinkin"),
     )
