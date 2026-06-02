@@ -9,7 +9,16 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import settings
 
 
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, future=True)
+# prepare_threshold=None: tắt prepared statement của psycopg3.
+# Supabase transaction pooler (port 6543) ghép nhiều kết nối backend → prepared
+# statement tạo ở connection này có thể không tồn tại ở connection khác, gây lỗi
+# 'prepared statement "_pg3_x" does not exist'. Tắt đi để chạy ổn định qua pooler.
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
+    future=True,
+    connect_args={"prepare_threshold": None},
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 

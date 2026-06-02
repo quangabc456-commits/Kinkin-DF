@@ -4,7 +4,17 @@ import argparse
 import sys
 from datetime import date
 
-from app.services.sheet_sync import list_date_sheets, parse_ngay_tu_ten_sheet, sync_sheet
+from app.services.sheet_sync import sync_all, sync_sheet
+
+
+def _in_ket_qua(i: int, tong: int, r: dict) -> None:
+    if "loi" in r:
+        print(f"[{i}/{tong}] {r['ten_sheet']}: LỖI {r['loi']}")
+    else:
+        print(
+            f"[{i}/{tong}] {r['ten_sheet']}: đọc={r['so_dong_doc']}, "
+            f"thêm={r['so_them_moi']}, cập nhật={r['so_cap_nhat']}, lỗi={r['so_loi']}"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -14,29 +24,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--from-date", help="Chỉ sync sheet >= ngày này (YYYY-MM-DD)")
     args = parser.parse_args(argv)
 
-    targets: list[str] = []
     if args.sheet:
-        targets = [args.sheet]
-    elif args.all:
-        targets = list_date_sheets()
-        if args.from_date:
-            from_dt = date.fromisoformat(args.from_date)
-            targets = [t for t in targets if (parse_ngay_tu_ten_sheet(t) or date.min) >= from_dt]
-    else:
-        parser.print_help()
-        return 1
-
-    print(f"Sync {len(targets)} sheet(s)...")
-    for i, t in enumerate(targets, 1):
         try:
-            r = sync_sheet(t)
-            print(
-                f"[{i}/{len(targets)}] {t}: đọc={r['so_dong_doc']}, "
-                f"thêm={r['so_them_moi']}, cập nhật={r['so_cap_nhat']}, lỗi={r['so_loi']}"
-            )
+            _in_ket_qua(1, 1, sync_sheet(args.sheet))
         except Exception as e:
-            print(f"[{i}/{len(targets)}] {t}: LỖI {e}")
-    return 0
+            print(f"{args.sheet}: LỖI {e}")
+        return 0
+
+    if args.all:
+        from_dt = date.fromisoformat(args.from_date) if args.from_date else None
+        ket_qua = sync_all(from_dt)
+        print(f"Sync {len(ket_qua)} sheet(s)...")
+        for i, r in enumerate(ket_qua, 1):
+            _in_ket_qua(i, len(ket_qua), r)
+        return 0
+
+    parser.print_help()
+    return 1
 
 
 if __name__ == "__main__":

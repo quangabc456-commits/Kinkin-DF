@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
+from gspread.exceptions import APIError
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -19,6 +20,25 @@ DATE_RE = re.compile(r"^(\d{1,2})-(\d{1,2})-(\d{2,4})$")
 
 DATA_START_ROW = 8
 RANGE_READ = "A1:Q1000"
+
+# Mã lỗi Google coi là tạm thời → retry với backoff (429 = vượt hạn mức request).
+_RETRY_CODES = {429, 500, 502, 503}
+
+
+def _api_retry(fn, *args, lan: int = 6, cho_ban_dau: float = 5.0, **kwargs):
+    """Gọi 1 hàm gspread, tự retry + exponential backoff khi gặp rate-limit/lỗi tạm thời."""
+    delay = cho_ban_dau
+    for attempt in range(1, lan + 1):
+        try:
+            return fn(*args, **kwargs)
+        except APIError as e:
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code in _RETRY_CODES and attempt < lan:
+                time.sleep(delay)
+                delay = min(delay * 2, 60.0)
+                continue
+            raise
+    raise RuntimeError("không thể tới đây")  # giúp type-checker hiểu hàm luôn return hoặc raise
 
 
 def get_current_sheet_id() -> str:
@@ -90,6 +110,15 @@ def _get(row: list[str], idx: int) -> str:
     return (row[idx] or "").strip()
 
 
+# Nhãn cột "mã vận đơn" — dùng để nhận diện dòng tiêu đề lọt vào vùng dữ liệu
+# (vài sheet cũ đặt header ở row 8 thay vì rows 1-7).
+_HEADER_MA_VAN_DON = {"mã vận đơn", "ma van don", "mã vđ"}
+
+
+def _la_dong_header(row: list[str]) -> bool:
+    return _get(row, 5).lower() in _HEADER_MA_VAN_DON
+
+
 def map_row(
     ten_sheet: str,
     ngay_chot: date,
@@ -98,6 +127,11 @@ def map_row(
     carry: dict,
 ) -> Optional[dict]:
     """Map 1 sheet row (after header) → dict insertable. Updates `carry` for fill-forward."""
+
+    # Vài sheet cũ để dòng tiêu đề ở row 8 (vùng dữ liệu) → bỏ qua, tránh nhét
+    # "Mã Vận đơn"... vào DB và đụng ràng buộc unique ma_van_don.
+    if _la_dong_header(row):
+        return None
 
     ma_kien_k = _get(row, 1) or carry.get("ma_kien_k")
     can_nang_kien = parse_so(_get(row, 2)) if _get(row, 2) else carry.get("can_nang_kien_kg")
@@ -141,15 +175,18 @@ def map_row(
     }
 
 
-def sync_sheet(ten_sheet: str) -> dict:
+def sync_sheet(ten_sheet: str, ws=None) -> dict:
+    """Sync 1 sheet. Truyền sẵn `ws` (worksheet đã mở) để tránh mở lại spreadsheet
+    mỗi lần — quan trọng khi sync_all chạy hàng trăm sheet (né rate-limit Google)."""
     ngay = parse_ngay_tu_ten_sheet(ten_sheet)
     if ngay is None:
         raise ValueError(f"Tên sheet không đúng định dạng dd-mm-yy: {ten_sheet}")
 
-    gc = get_client(readonly=True)
-    sh = gc.open_by_key(get_current_sheet_id())
-    ws = sh.worksheet(ten_sheet)
-    values = ws.get_values(RANGE_READ)
+    if ws is None:
+        gc = get_client(readonly=True)
+        sh = _api_retry(gc.open_by_key, get_current_sheet_id())
+        ws = sh.worksheet(ten_sheet)
+    values = _api_retry(ws.get_values, RANGE_READ)
 
     rows_payload: list[dict] = []
     carry: dict = {"ma_kien_k": None, "can_nang_kien_kg": None, "ma_f_cha": None}
@@ -182,28 +219,29 @@ def sync_sheet(ten_sheet: str) -> dict:
         session.add(log)
         session.flush()
 
-        for payload in rows_payload:
-            exists = session.execute(
-                select(DuLieuSheet.id).where(
-                    DuLieuSheet.ten_sheet == payload["ten_sheet"],
-                    DuLieuSheet.sheet_row_index == payload["sheet_row_index"],
-                )
-            ).first()
+        if rows_payload:
+            # Lấy 1 lần các row_index đã có của sheet này → đếm thêm/cập nhật trong RAM,
+            # tránh 1 query SELECT mỗi dòng (quan trọng khi ghi qua pooler Supabase từ xa).
+            existing_idx = set(
+                session.execute(
+                    select(DuLieuSheet.sheet_row_index).where(
+                        DuLieuSheet.ten_sheet == ten_sheet
+                    )
+                ).scalars().all()
+            )
+            so_cap_nhat = sum(1 for p in rows_payload if p["sheet_row_index"] in existing_idx)
+            so_them_moi = len(rows_payload) - so_cap_nhat
 
-            stmt = pg_insert(DuLieuSheet).values(**payload)
-            stmt = stmt.on_conflict_do_update(
+            # Upsert cả sheet trong 1 lệnh (thay vì mỗi dòng 1 lệnh).
+            cap_nhat_cols = [
+                k for k in rows_payload[0] if k not in ("ten_sheet", "sheet_row_index")
+            ]
+            ins = pg_insert(DuLieuSheet).values(rows_payload)
+            stmt = ins.on_conflict_do_update(
                 index_elements=["ten_sheet", "sheet_row_index"],
-                set_={
-                    k: v
-                    for k, v in payload.items()
-                    if k not in ("ten_sheet", "sheet_row_index")
-                },
+                set_={k: getattr(ins.excluded, k) for k in cap_nhat_cols},
             )
             session.execute(stmt)
-            if exists:
-                so_cap_nhat += 1
-            else:
-                so_them_moi += 1
 
         log.so_dong_them_moi = so_them_moi
         log.so_dong_cap_nhat = so_cap_nhat
@@ -232,14 +270,23 @@ def list_date_sheets() -> list[str]:
 
 
 def sync_all(from_date: Optional[date] = None) -> list[dict]:
-    targets = list_date_sheets()
+    """Sync mọi sheet dd-mm-yy. Mở spreadsheet + lấy danh sách worksheet 1 LẦN
+    rồi tái dùng cho từng sheet → tránh gọi open_by_key lặp lại (nguyên nhân chính
+    gây rate-limit 429 khiến sync_all chạy không ổn định)."""
+    gc = get_client(readonly=True)
+    sh = _api_retry(gc.open_by_key, get_current_sheet_id())
+    ws_map = {ws.title: ws for ws in _api_retry(sh.worksheets)}
+
+    targets = [t for t in ws_map if parse_ngay_tu_ten_sheet(t) is not None]
     if from_date:
         targets = [t for t in targets if (parse_ngay_tu_ten_sheet(t) or date.min) >= from_date]
+    # Xử lý theo thứ tự ngày mới → cũ để sheet gần đây vào DB trước.
+    targets.sort(key=lambda t: parse_ngay_tu_ten_sheet(t) or date.min, reverse=True)
 
     ket_qua: list[dict] = []
     for t in targets:
         try:
-            ket_qua.append(sync_sheet(t))
+            ket_qua.append(sync_sheet(t, ws=ws_map[t]))
         except Exception as e:
             ket_qua.append({"ten_sheet": t, "loi": str(e)})
         time.sleep(0.3)
