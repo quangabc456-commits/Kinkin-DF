@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import phan_trang %}
-{% block title %}Vận đơn Viettel — KIN KIN PGH{% endblock %}
+{% block title %}Vận đơn — KIN KIN PGH{% endblock %}
 {% block content %}
 
 {% set hien_tai = rows|length %}
@@ -10,9 +10,9 @@
 
 <div class="stat-grid">
   <div class="stat">
-    <div class="label">Tổng vận đơn Viettel</div>
+    <div class="label">Tổng vận đơn{% if pt %} · {{ pt }}{% endif %}</div>
     <div class="value">{{ total_items }}</div>
-    <div class="sub">{{ hien_tai }} dòng trong trang này</div>
+    <div class="sub">{{ hien_tai }} dòng trong trang này{% if not pt %} · mọi phương thức{% endif %}</div>
   </div>
   <div class="stat">
     <div class="label">Chờ chốt PGH</div>
@@ -38,6 +38,15 @@
       <input id="q" name="q" type="search" placeholder="Tên KH / mã vận đơn / kiện K..." value="{{ q }}" style="width: 320px">
     </div>
     <div style="display:flex; flex-direction:column; gap:.2rem;">
+      <label for="pt">Phương thức gửi</label>
+      <select id="pt" name="pt">
+        <option value="">— Tất cả phương thức —</option>
+        {% for p, n in phuong_thuc_list %}
+          <option value="{{ p }}" {% if p == pt %}selected{% endif %}>{{ p }} · {{ n }} dòng</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:.2rem;">
       <label for="ngay">Ngày chốt đơn</label>
       <select id="ngay" name="ngay">
         <option value="">— Tất cả ngày —</option>
@@ -48,7 +57,7 @@
     </div>
     <div style="align-self:flex-end;">
       <button class="btn" type="submit">Lọc</button>
-      {% if q or ngay %}
+      {% if q or ngay or pt %}
         <a class="btn ghost sm" href="/" style="margin-left:.4rem;">Xoá lọc</a>
       {% endif %}
     </div>
@@ -65,6 +74,7 @@
         <th title="Click mã để xem chi tiết Kinkin">Thùng (F con)</th>
         <th title="Click mã để xem chi tiết Kinkin">Mã vận đơn</th>
         <th>Khách hàng</th>
+        <th>Phương thức</th>
         <th>SĐT</th>
         <th>Địa chỉ</th>
         <th class="nowrap">Cân (kg)</th>
@@ -83,8 +93,15 @@
           <td class="nowrap">{% if r.ma_thung %}<button type="button" class="code-btn" data-code="{{ r.ma_thung }}">{{ r.ma_thung }}</button>{% else %}—{% endif %}</td>
           <td class="nowrap"><button type="button" class="code-btn code-btn--mono" data-code="{{ r.ma_van_don }}">{{ r.ma_van_don }}</button></td>
           <td>{{ r.ten_kh or '—' }}</td>
+          <td class="nowrap">{% if r.phuong_thuc_gui %}<span class="badge {% if 'viettel' in r.phuong_thuc_gui|lower %}viettel{% else %}neutral{% endif %}">{{ r.phuong_thuc_gui }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
           <td class="nowrap">{{ r.sdt_nguoi_nhan or '—' }}</td>
-          <td><div class="addr" title="{{ r.dia_chi_nguoi_nhan or '' }}">{{ r.dia_chi_nguoi_nhan or '—' }}</div></td>
+          <td>
+            {% if r.dia_chi_nguoi_nhan %}
+              <div class="addr" title="{{ r.dia_chi_nguoi_nhan }}">{{ r.dia_chi_nguoi_nhan }}</div>
+            {% else %}
+              <span class="badge warn dot" title="Đơn chưa có địa chỉ người nhận">Chưa có địa chỉ</span>
+            {% endif %}
+          </td>
           <td class="nowrap">{{ r.can_nang_kg or '—' }}</td>
           <td>
             {% if p and p.ma_pgh_vtp %}
@@ -117,7 +134,11 @@
             {% endif %}
           </td>
           <td>
-            {% if not (p and p.ma_pgh_vtp) and not (p and p.trang_thai_pgh == 'cho_dien_thong_tin') %}
+            {% if (p and p.ma_pgh_vtp) or (p and p.trang_thai_pgh == 'cho_dien_thong_tin') %}
+              <span class="muted">—</span>
+            {% elif not r.dia_chi_nguoi_nhan %}
+              <span class="badge warn dot" title="Cần địa chỉ người nhận trước khi tạo PGH">Thiếu địa chỉ</span>
+            {% else %}
               <form method="post" action="/chot/{{ r.id }}" onsubmit="return confirm('Chốt PGH cho vận đơn {{ r.ma_van_don }}?')">
                 {% if tai_khoans|length > 1 %}
                   <select name="tai_khoan_vtp_id" class="sm">
@@ -128,14 +149,12 @@
                 {% endif %}
                 <button class="btn sm" type="submit">Chốt PGH</button>
               </form>
-            {% else %}
-              <span class="muted">—</span>
             {% endif %}
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="12" style="text-align:center; padding: 2.5rem 1rem;">
-          <div class="muted" style="font-size:14px;">Không có vận đơn Viettel nào khớp bộ lọc.</div>
+        <tr><td colspan="13" style="text-align:center; padding: 2.5rem 1rem;">
+          <div class="muted" style="font-size:14px;">Không có vận đơn nào khớp bộ lọc.</div>
           <div class="muted" style="font-size:12.5px; margin-top:.3rem;">Thử bỏ lọc hoặc sync sheet mới bằng <code>python -m app.cli.sync --sheet &lt;dd-mm-yy&gt;</code>.</div>
         </td></tr>
       {% endfor %}
