@@ -23,6 +23,7 @@ totals_per_day.json
 BOT- DF.json
 .DS_Store
 log*.txt
+logs/
 
 .vercel
 .env*

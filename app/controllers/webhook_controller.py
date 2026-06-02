@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
@@ -9,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.config import settings
 from app.core.db import get_session
-from app.models import CauHinh, HanhTrinhPgh, PhieuGiaoHang
+from app.models import CauHinh, DuLieuSheet, HanhTrinhPgh, PhieuGiaoHang
 
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -143,3 +144,169 @@ async def nhan_sheet_changed(
 
     background_tasks.add_task(_sync_sheet_bg, sheet_name)
     return {"status": "queued", "sheet": sheet_name}
+
+
+_ALLOWED_FIELDS = {
+    "ten_sheet",
+    "ngay_chot",
+    "sheet_row_index",
+    "ma_kien_k",
+    "can_nang_kien_kg",
+    "ma_f_cha",
+    "ma_thung",
+    "ma_van_don",
+    "can_nang_kg",
+    "phu_thu",
+    "ghi_chu",
+    "ten_kh",
+    "phuong_thuc_gui",
+    "thong_tin_gui_raw",
+    "nhom_san_pham",
+    "dia_chi_nguoi_nhan",
+    "sdt_nguoi_nhan",
+    "trang_thai_goc",
+    "ma_genkin",
+    "khoi_luong_genkin_kg",
+    "co_match_genkin",
+}
+
+_DECIMAL_FIELDS = {"can_nang_kien_kg", "can_nang_kg", "khoi_luong_genkin_kg"}
+
+
+def _to_decimal(v: Any) -> Optional[Decimal]:
+    if v is None or v == "":
+        return None
+    if isinstance(v, Decimal):
+        return v
+    try:
+        return Decimal(str(v).replace(",", "."))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _to_date(v: Any) -> Optional[date]:
+    if not v:
+        return None
+    if isinstance(v, date) and not isinstance(v, datetime):
+        return v
+    s = str(v).strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d-%m-%y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _normalize(raw: dict) -> dict:
+    out: dict = {}
+    for k, v in raw.items():
+        if k not in _ALLOWED_FIELDS:
+            continue
+        if v is None or v == "":
+            out[k] = None
+            continue
+        if k == "ngay_chot":
+            out[k] = _to_date(v)
+        elif k in _DECIMAL_FIELDS:
+            out[k] = _to_decimal(v)
+        elif k == "sheet_row_index":
+            try:
+                out[k] = int(v)
+            except (TypeError, ValueError):
+                out[k] = None
+        elif k == "co_match_genkin":
+            if isinstance(v, bool):
+                out[k] = v
+            else:
+                out[k] = str(v).strip().upper() == "TRUE"
+        else:
+            out[k] = str(v)
+    return out
+
+
+@router.post("/kinkin")
+async def nhan_webhook_kinkin(
+    request: Request,
+    x_kinkin_secret: Optional[str] = Header(default=None, alias="X-Kinkin-Secret"),
+) -> dict[str, Any]:
+    """Nhận push từ Kinkin: 1 row (object) hoặc list rows giống schema du_lieu_sheet.
+
+    Auth: header X-Kinkin-Secret phải khớp settings.KK_WEBHOOK_SECRET.
+    Idempotent: upsert theo (ten_sheet, sheet_row_index).
+    """
+    if not settings.KK_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="KK_WEBHOOK_SECRET chưa cấu hình")
+    if (x_kinkin_secret or "") != settings.KK_WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Sai X-Kinkin-Secret")
+
+    payload = await request.json()
+    if isinstance(payload, dict) and "rows" in payload:
+        rows_raw = payload.get("rows") or []
+    elif isinstance(payload, dict):
+        rows_raw = [payload]
+    elif isinstance(payload, list):
+        rows_raw = payload
+    else:
+        raise HTTPException(status_code=400, detail="Payload phải là object hoặc list")
+
+    so_them = 0
+    so_cap_nhat = 0
+    so_bypass = 0
+    bypass_reasons: list[dict] = []
+
+    now = datetime.now(timezone.utc)
+
+    with get_session() as session:
+        for idx, raw in enumerate(rows_raw):
+            if not isinstance(raw, dict):
+                so_bypass += 1
+                bypass_reasons.append({"i": idx, "reason": "row không phải dict"})
+                continue
+            row = _normalize(raw)
+            row["dong_bo_lan_cuoi_luc"] = now
+
+            if not row.get("ten_sheet") or row.get("sheet_row_index") is None:
+                so_bypass += 1
+                bypass_reasons.append(
+                    {"i": idx, "reason": "thiếu ten_sheet/sheet_row_index"}
+                )
+                continue
+            if not row.get("ma_van_don"):
+                so_bypass += 1
+                bypass_reasons.append({"i": idx, "reason": "thiếu ma_van_don"})
+                continue
+            if row.get("ngay_chot") is None:
+                so_bypass += 1
+                bypass_reasons.append({"i": idx, "reason": "ngay_chot không parse được"})
+                continue
+
+            existing = session.execute(
+                select(DuLieuSheet.id).where(
+                    DuLieuSheet.ten_sheet == row["ten_sheet"],
+                    DuLieuSheet.sheet_row_index == row["sheet_row_index"],
+                )
+            ).first()
+
+            stmt = pg_insert(DuLieuSheet).values(**row).on_conflict_do_update(
+                index_elements=["ten_sheet", "sheet_row_index"],
+                set_={
+                    k: v
+                    for k, v in row.items()
+                    if k not in ("ten_sheet", "sheet_row_index")
+                },
+            )
+            session.execute(stmt)
+            if existing:
+                so_cap_nhat += 1
+            else:
+                so_them += 1
+
+    return {
+        "status": "ok",
+        "nhan": len(rows_raw),
+        "them_moi": so_them,
+        "cap_nhat": so_cap_nhat,
+        "bypass": so_bypass,
+        "bypass_reasons": bypass_reasons[:10],
+    }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.models.audit import CauHinh, LogApiVtp, LogDongBoSheet
 from app.models.base import Base
+from app.models.cache_kinkin_ma import CacheKinkinMa
 from app.models.dia_danh import DiaDanhHuyen, DiaDanhTinh, DiaDanhXa
 from app.models.du_lieu_sheet import DuLieuSheet
 from app.models.hanh_trinh_pgh import HanhTrinhPgh
@@ -23,4 +24,5 @@ __all__ = [
     "LogDongBoSheet",
     "LogApiVtp",
     "CauHinh",
+    "CacheKinkinMa",
 ]

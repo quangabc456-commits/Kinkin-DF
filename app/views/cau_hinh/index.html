@@ -51,17 +51,6 @@
       </span>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: .35rem; margin-bottom: .85rem;">
-      <label for="webhook_base">Webhook Base URL (cho Apps Script gọi về)</label>
-      <input id="webhook_base" name="webhook_base" type="text"
-             placeholder="https://abc.ngrok.io  (để trống nếu test local cùng máy)"
-             value="{{ webhook_base_url }}"
-             style="width: 100%;">
-      <span class="muted" style="font-size: 12px;">
-        Để Google gọi được vào app, URL phải public HTTPS (ngrok / cloudflared / domain thật). Local <code>127.0.0.1</code> Google không truy cập được.
-      </span>
-    </div>
-
     <div class="row">
       <button class="btn" type="submit">Lưu cấu hình</button>
       {% if sheet_url_hien_tai %}
@@ -111,6 +100,171 @@
   </p>
 </div>
 {% endif %}
+
+<!-- VTP ACCOUNTS -->
+<div class="card" id="vtp-accounts">
+  <div class="card-title">📦 Tài khoản ViettelPost</div>
+  <p class="muted" style="margin-top: 0;">
+    Worker chốt PGH lấy tài khoản <strong>mặc định</strong> đang <strong>kích hoạt</strong>. Password được mã hoá Fernet trước khi lưu, không hiển thị lại được. Sender info (tên, SĐT, địa chỉ kho gửi) lấy từ chính tài khoản VTP — không cần khai báo ở đây.
+  </p>
+
+  {% if not co_fernet %}
+    <div style="background: var(--kk-warn-bg); color: var(--kk-warn); padding:.65rem .85rem; border-radius: var(--kk-radius-sm); margin-bottom:.75rem;">
+      ⚠️ Thiếu <code>FERNET_KEY</code> trong <code>.env</code> — không thêm được tài khoản dùng password. Tạo key bằng:<br>
+      <code>python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</code>
+    </div>
+  {% endif %}
+
+  {% if vtp_accounts %}
+    <div class="table-wrap" style="margin-top: .5rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tên hiển thị</th>
+            <th>Username</th>
+            <th>Môi trường</th>
+            <th>Có password</th>
+            <th>Có secret_token</th>
+            <th>Token cache</th>
+            <th>Trạng thái</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tk in vtp_accounts %}
+            <tr>
+              <td>{{ tk.id }}</td>
+              <td>
+                <strong>{{ tk.ten_hien_thi }}</strong>
+                {% if tk.mac_dinh %}<span class="badge ok dot" style="margin-left:.3rem;">Mặc định</span>{% endif %}
+              </td>
+              <td><code>{{ tk.username }}</code></td>
+              <td>
+                {% if tk.moi_truong == 'production' %}<span class="badge ok">production</span>
+                {% else %}<span class="badge warn">development</span>{% endif %}
+              </td>
+              <td>{% if tk.co_password %}<span class="badge ok dot">Có</span>{% else %}—{% endif %}</td>
+              <td>{% if tk.co_secret_token %}<span class="badge ok dot">Có</span>{% else %}—{% endif %}</td>
+              <td>
+                {% if tk.co_token %}<span class="badge ok dot">cache</span><br><span class="muted" style="font-size:11px;">{{ tk.token_het_han_luc[:19] if tk.token_het_han_luc else '' }}</span>
+                {% else %}<span class="muted">chưa có</span>{% endif %}
+              </td>
+              <td>
+                {% if tk.kich_hoat %}<span class="badge ok dot">Bật</span>{% else %}<span class="badge err dot">Tắt</span>{% endif %}
+              </td>
+              <td style="white-space: nowrap;">
+                <button class="btn ghost sm" type="button" onclick="document.getElementById('edit-vtp-{{ tk.id }}').style.display='block'">Sửa</button>
+                {% if not tk.mac_dinh %}
+                  <form method="post" action="/cau-hinh/tai-khoan-vtp/{{ tk.id }}/dat-mac-dinh" style="display:inline;">
+                    <button class="btn ghost sm" type="submit">Đặt mặc định</button>
+                  </form>
+                  <form method="post" action="/cau-hinh/tai-khoan-vtp/{{ tk.id }}/xoa" style="display:inline;">
+                    <button class="btn ghost sm" type="submit" onclick="return confirm('Xoá tài khoản {{ tk.ten_hien_thi }}?')" style="color: var(--kk-error);">Xoá</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+            <tr id="edit-vtp-{{ tk.id }}" style="display:none; background: #fafafa;">
+              <td colspan="9">
+                <form method="post" action="/cau-hinh/tai-khoan-vtp/{{ tk.id }}/cap-nhat" style="padding:.5rem;">
+                  <div class="row" style="gap:.75rem; flex-wrap: wrap;">
+                    <div style="flex:1; min-width:180px;">
+                      <label>Tên hiển thị</label>
+                      <input name="ten_hien_thi" type="text" value="{{ tk.ten_hien_thi }}" required>
+                    </div>
+                    <div style="flex:1; min-width:180px;">
+                      <label>Password mới (để trống = giữ nguyên)</label>
+                      <input name="password" type="password" autocomplete="new-password" placeholder="••••••">
+                    </div>
+                    <div style="flex:1; min-width:180px;">
+                      <label>Secret token mới (để trống = giữ)</label>
+                      <input name="secret_token" type="password" autocomplete="new-password" placeholder="••••••">
+                    </div>
+                    <div style="flex:1; min-width:180px;">
+                      <label>Webhook secret (Authorization header)</label>
+                      <input name="webhook_secret" type="text" placeholder="để trống = giữ nguyên">
+                    </div>
+                    <div style="flex:0 0 140px;">
+                      <label>Môi trường</label>
+                      <select name="moi_truong">
+                        <option value="production" {% if tk.moi_truong == 'production' %}selected{% endif %}>production</option>
+                        <option value="development" {% if tk.moi_truong == 'development' %}selected{% endif %}>development</option>
+                      </select>
+                    </div>
+                    <div style="flex:0 0 120px; align-self:flex-end;">
+                      <label style="display:flex; gap:.3rem; align-items:center;">
+                        <input name="kich_hoat" type="checkbox" value="on" {% if tk.kich_hoat %}checked{% endif %}>
+                        Kích hoạt
+                      </label>
+                    </div>
+                  </div>
+                  <div style="margin-top:.6rem;">
+                    <button class="btn" type="submit">Lưu thay đổi</button>
+                    <button class="btn ghost sm" type="button" onclick="document.getElementById('edit-vtp-{{ tk.id }}').style.display='none'">Huỷ</button>
+                  </div>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted">Chưa có tài khoản nào. Thêm tài khoản đầu tiên ở form dưới.</p>
+  {% endif %}
+
+  <!-- Form thêm mới -->
+  <details {% if not vtp_accounts %}open{% endif %} style="margin-top: 1rem;">
+    <summary style="cursor: pointer; font-weight: 600;">➕ Thêm tài khoản ViettelPost mới</summary>
+    <form method="post" action="/cau-hinh/tai-khoan-vtp/them" style="margin-top:.75rem;">
+      <div class="row" style="gap:.75rem; flex-wrap: wrap;">
+        <div style="flex:1; min-width:200px;">
+          <label>Tên hiển thị *</label>
+          <input name="ten_hien_thi" type="text" placeholder="vd: Kho Hà Nội" required>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <label>Username (SĐT đăng ký VTP) *</label>
+          <input name="username" type="text" placeholder="0901234567" required>
+        </div>
+        <div style="flex:0 0 140px;">
+          <label>Môi trường</label>
+          <select name="moi_truong">
+            <option value="production">production</option>
+            <option value="development">development</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="gap:.75rem; flex-wrap: wrap; margin-top:.6rem;">
+        <div style="flex:1; min-width:200px;">
+          <label>Password VTP</label>
+          <input name="password" type="password" autocomplete="new-password" placeholder="Nhập password (sẽ mã hoá)">
+          <span class="muted" style="font-size:11px;">Mã hoá Fernet trước khi lưu DB.</span>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <label>Hoặc Secret token (mục 2.3 docs VTP)</label>
+          <input name="secret_token" type="password" autocomplete="new-password" placeholder="Token dài hạn từ trang VTP">
+          <span class="muted" style="font-size:11px;">Ưu tiên khi có cả 2; token bền 1-2 năm.</span>
+        </div>
+      </div>
+      <div class="row" style="gap:.75rem; flex-wrap: wrap; margin-top:.6rem;">
+        <div style="flex:1; min-width:200px;">
+          <label>Webhook secret (VTP gửi qua header Authorization)</label>
+          <input name="webhook_secret" type="text" placeholder="để trống nếu chưa dùng webhook">
+        </div>
+        <div style="flex:0 0 160px; align-self:flex-end;">
+          <label style="display:flex; gap:.3rem; align-items:center;">
+            <input name="mac_dinh" type="checkbox" value="on">
+            Đặt làm mặc định
+          </label>
+        </div>
+      </div>
+      <div style="margin-top:.85rem;">
+        <button class="btn" type="submit" {% if not co_fernet %}disabled title="Thiếu FERNET_KEY"{% endif %}>Thêm tài khoản</button>
+      </div>
+    </form>
+  </details>
+</div>
 
 <!-- KINKIN STATUS (read-only, config hardcoded trong .env) -->
 <div class="card">

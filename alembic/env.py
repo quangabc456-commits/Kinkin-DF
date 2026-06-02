@@ -16,7 +16,8 @@ if config.config_file_name is not None:
 
 db_url = os.getenv("DATABASE_URL")
 if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+    # configparser uses '%' for interpolation — escape any '%' in URL (e.g. %40 for @ in password)
+    config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 from app.models import Base  # noqa: E402
 

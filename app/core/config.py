@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     KK_WAREHOUSE_IDS: str = ""
     KK_CUSTOMER_CODE: str = "450HN-GENKIN"
     KK_PACKAGEK_APIKEY: str = ""
+    KK_WEBHOOK_SECRET: str = ""
+
+    CRON_WORKER_BATCH: int = 50
+    CRON_WORKER_REFRESH_DAYS: int = 7
+    CRON_WORKER_DRY_RUN: bool = False
 
     @property
     def kk_warehouse_ids(self) -> list[str]:

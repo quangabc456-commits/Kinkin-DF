@@ -216,6 +216,8 @@
     padding: 2px 7px; border-radius: var(--kk-radius-pill);
     background: var(--kk-line-soft); color: var(--kk-muted);
   }
+  .kk-section__pill--warn { background: var(--kk-warn-bg); color: var(--kk-warn); }
+  .kk-section__pill--err { background: var(--kk-error-bg); color: var(--kk-error); }
   .kk-grid {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem .85rem;
     background: var(--kk-line-soft);
@@ -255,17 +257,20 @@
   const title = document.getElementById('kk-modal-title');
   const eyebrow = document.getElementById('kk-modal-eyebrow');
 
+  let activeCode = null;
+
   function openModal(code) {
+    activeCode = code;
     title.textContent = code;
-    eyebrow.textContent = 'Đang tra cứu…';
-    body.innerHTML = '<div class="muted" style="text-align:center; padding:2rem 0;">⏳ Đang gọi Kinkin API…</div>';
+    eyebrow.textContent = 'Đang đọc DB…';
+    body.innerHTML = '<div class="muted" style="text-align:center; padding:2rem 0;">⏳ Đang tải từ DB…</div>';
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
 
     fetch('/api/kinkin/lookup/' + encodeURIComponent(code))
       .then(r => r.json())
-      .then(data => render(data))
+      .then(data => render(data, code))
       .catch(err => {
         body.innerHTML = '<div class="kk-err">Lỗi gọi API: ' + escapeHtml(err.message || String(err)) + '</div>';
       });
@@ -287,14 +292,27 @@
     return '<div><label>' + escapeHtml(label) + '</label><span>' + (value == null || value === '' ? '<span class="muted">—</span>' : escapeHtml(value)) + '</span></div>';
   }
 
-  function render(data) {
+  function fmtMoney(v) {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    if (isNaN(n)) return v;
+    return n.toLocaleString('vi-VN') + ' đ';
+  }
+  function fmtDt(v) {
+    if (!v) return null;
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    return d.toLocaleString('vi-VN', { hour12: false });
+  }
+
+  function render(data, currentCode) {
     eyebrow.textContent = 'Loại mã: ' + (data.loai || 'unknown');
     const parts = [];
 
     if (data.local) {
       const l = data.local;
       parts.push('<section class="kk-section">'
-        + '<div class="kk-section__head"><h3 class="kk-section__title">📑 Dữ liệu local (du_lieu_sheet)</h3>'
+        + '<div class="kk-section__head"><h3 class="kk-section__title">📑 Dữ liệu local (sheet)</h3>'
         + '<span class="kk-section__pill">' + escapeHtml(l.ten_sheet) + '</span></div>'
         + '<div class="kk-grid">'
         + fld('Mã kiện K', l.ma_kien_k)
@@ -314,15 +332,51 @@
       parts.push('<section class="kk-section"><div class="muted">Không tìm thấy mã này trong dữ liệu local.</div></section>');
     }
 
-    if (data.loi) {
-      parts.push('<div class="kk-err">⚠ ' + escapeHtml(data.loi) + '</div>');
-    }
+    const k = data.kinkin;
+    const trangThaiCache = data.trang_thai_cache;
+    let pillTxt = 'từ DB';
+    let pillClass = '';
+    if (trangThaiCache === 'chua_co') { pillTxt = 'chưa có cache'; pillClass = 'kk-section__pill--warn'; }
+    else if (trangThaiCache === 'loi') { pillTxt = 'lỗi sync'; pillClass = 'kk-section__pill--err'; }
+    else if (trangThaiCache === 'trong') { pillTxt = 'cache rỗng'; pillClass = 'kk-section__pill--warn'; }
 
-    if (data.kinkin) {
-      parts.push('<section class="kk-section">'
-        + '<div class="kk-section__head"><h3 class="kk-section__title">🔗 Phản hồi từ Kinkin API</h3>'
-        + '<span class="kk-section__pill">live</span></div>'
-        + '<pre class="kk-json">' + escapeHtml(JSON.stringify(data.kinkin, null, 2)) + '</pre>'
+    const headerHtml = '<div class="kk-section__head">'
+      + '<h3 class="kk-section__title">🔗 Thông tin từ Kinkin</h3>'
+      + '<span class="kk-section__pill ' + pillClass + '">' + pillTxt + '</span>'
+      + '<button type="button" class="btn ghost sm" data-refresh-code="' + escapeHtml(currentCode) + '" style="margin-left:auto;">↻ Refresh từ Kinkin</button>'
+      + '</div>';
+
+    if (k && trangThaiCache === 'ok') {
+      parts.push('<section class="kk-section">' + headerHtml
+        + '<div class="kk-grid">'
+        + fld('Mã đơn chính', k.ma_don_chinh)
+        + fld('Mã bill', k.bill_code)
+        + fld('Trạng thái', k.trang_thai)
+        + fld('Kho', k.ten_kho)
+        + fld('Warehouse ID', k.warehouse_id)
+        + fld('Nhà vận chuyển', k.nha_van_chuyen)
+        + fld('Người nhận', k.nguoi_nhan)
+        + fld('SĐT người nhận', k.sdt_nguoi_nhan)
+        + fld('Địa chỉ nhận', k.dia_chi_nhan)
+        + fld('Số lượng', k.so_luong)
+        + fld('Tổng tiền', fmtMoney(k.tong_tien_vnd))
+        + fld('Ngày tạo (Kinkin)', fmtDt(k.ngay_tao_kinkin))
+        + fld('Cập nhật lần cuối', fmtDt(k.ngay_cap_nhat_kinkin))
+        + fld('Sync local lúc', fmtDt(k.last_sync_luc))
+        + '</div></section>');
+    } else if (k && trangThaiCache === 'loi') {
+      parts.push('<section class="kk-section">' + headerHtml
+        + '<div class="kk-err">⚠ Lỗi sync gần nhất: ' + escapeHtml(k.last_sync_loi || '?') + '</div>'
+        + '<div class="muted" style="margin-top:.4rem;">Lần thử cuối: ' + escapeHtml(fmtDt(k.last_sync_luc) || '—') + '</div>'
+        + '</section>');
+    } else if (k && trangThaiCache === 'trong') {
+      parts.push('<section class="kk-section">' + headerHtml
+        + '<div class="muted">Đã sync nhưng API Kinkin không trả về data. Có thể mã không tồn tại trên hệ thống Kinkin.</div>'
+        + '<div class="muted" style="font-size:11px; margin-top:.3rem;">Sync lúc: ' + escapeHtml(fmtDt(k.last_sync_luc) || '—') + '</div>'
+        + '</section>');
+    } else {
+      parts.push('<section class="kk-section">' + headerHtml
+        + '<div class="muted">Mã này chưa được worker cron cache. Bấm <strong>Refresh từ Kinkin</strong> để pull ngay.</div>'
         + '</section>');
     }
 
@@ -334,6 +388,23 @@
     if (btn) {
       const code = btn.getAttribute('data-code');
       if (code) openModal(code);
+      return;
+    }
+    const refreshBtn = e.target.closest('[data-refresh-code]');
+    if (refreshBtn) {
+      const code = refreshBtn.getAttribute('data-refresh-code');
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = '⏳ Đang gọi Kinkin…';
+      fetch('/api/kinkin/refresh/' + encodeURIComponent(code), { method: 'POST' })
+        .then(r => r.json())
+        .then(() => fetch('/api/kinkin/lookup/' + encodeURIComponent(code)))
+        .then(r => r.json())
+        .then(data => render(data, code))
+        .catch(err => {
+          refreshBtn.disabled = false;
+          refreshBtn.textContent = '↻ Thử lại';
+          alert('Lỗi refresh: ' + err);
+        });
       return;
     }
     if (e.target.matches('[data-modal-close]')) closeModal();
