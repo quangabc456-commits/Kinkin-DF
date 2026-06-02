@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     KK_BASE_IDENTITY: str = "https://identityapi.vanchuyenkinkin.com"
     KK_BASE_WAREHOUSE: str = "https://warehouseexportapi.vanchuyenkinkin.com"
     KK_BASE_DEPARTURE: str = "https://warehousedepartureapi.vanchuyenkinkin.com"
+    # API kho đến — hệ *.dion.vn (RIÊNG, khác hệ vanchuyenkinkin.com ở trên)
+    KK_BASE_KHODEN: str = "https://apikhoden-kinkin.dion.vn"      # PGH + địa chỉ
+    KK_BASE_KHODEN_IDENTITY: str = "https://identity-kinkin.dion.vn"  # /connect/token
+    KK_BASE_KHODEN_CORE: str = "https://apicore-kinkin.dion.vn"   # khách + địa danh
+    # Tài khoản hệ dion.vn (KHÁC KK_USERNAME/KK_PASSWORD ở trên — aitool01 không dùng được)
+    KK_KHODEN_USERNAME: str = ""
+    KK_KHODEN_PASSWORD: str = ""
     KK_USERNAME: str = ""
     KK_PASSWORD: str = ""
     KK_WAREHOUSE_IDS: str = ""

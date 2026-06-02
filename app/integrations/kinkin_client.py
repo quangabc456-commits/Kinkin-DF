@@ -211,3 +211,7 @@ def k_history(code: str) -> dict:
         {"code": code},
         custom_headers={"_apikey": settings.KK_PACKAGEK_APIKEY},
     )
+
+
+# Lưu ý: API KHO ĐẾN (*.dion.vn) nằm ở module riêng app/integrations/khoden_client.py
+# vì dùng identity + token KHÁC hệ vanchuyenkinkin.com này.
