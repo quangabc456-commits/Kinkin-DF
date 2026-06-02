@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Thư mục gốc dự án (app/core/config.py -> ../../..)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -42,6 +47,13 @@ class Settings(BaseSettings):
     @property
     def kk_warehouse_ids(self) -> list[str]:
         return [s.strip() for s in self.KK_WAREHOUSE_IDS.split(",") if s.strip()]
+
+    @property
+    def google_creds_abs_path(self) -> Path:
+        """Đường dẫn tuyệt đối tới file creds — neo theo gốc dự án nếu là path tương đối,
+        để app chạy từ thư mục làm việc nào cũng tìm thấy file."""
+        p = Path(self.GOOGLE_CREDS_PATH)
+        return p if p.is_absolute() else (PROJECT_ROOT / p)
 
 
 settings = Settings()

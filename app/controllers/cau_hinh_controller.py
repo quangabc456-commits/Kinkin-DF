@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 import secrets
-from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -41,7 +40,7 @@ def _doc_bot_info() -> dict:
             raw = base64.b64decode(settings.GOOGLE_CREDS_JSON_B64).decode("utf-8")
             data = json.loads(raw)
         else:
-            data = json.loads(Path(settings.GOOGLE_CREDS_PATH).read_text(encoding="utf-8"))
+            data = json.loads(settings.google_creds_abs_path.read_text(encoding="utf-8"))
         return {
             "email": data.get("client_email"),
             "project": data.get("project_id"),

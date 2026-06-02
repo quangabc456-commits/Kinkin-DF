@@ -25,7 +25,7 @@ def _doc_creds_info() -> dict:
     if settings.GOOGLE_CREDS_JSON_B64:
         raw = base64.b64decode(settings.GOOGLE_CREDS_JSON_B64).decode("utf-8")
         return json.loads(raw)
-    with open(settings.GOOGLE_CREDS_PATH, encoding="utf-8") as f:
+    with open(settings.google_creds_abs_path, encoding="utf-8") as f:
         return json.load(f)
 
 
