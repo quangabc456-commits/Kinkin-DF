@@ -1,17 +1,18 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import phan_trang %}
 {% block title %}Vận đơn Viettel — KIN KIN PGH{% endblock %}
 {% block content %}
 
-{% set total = rows|length %}
+{% set hien_tai = rows|length %}
 {% set so_da_chot = pgh_map.values()|selectattr('ma_pgh_vtp')|list|length %}
 {% set so_loi = pgh_map.values()|selectattr('trang_thai_pgh','equalto','loi_api')|list|length %}
-{% set so_cho = total - so_da_chot - so_loi %}
+{% set so_cho = hien_tai - so_da_chot - so_loi %}
 
 <div class="stat-grid">
   <div class="stat">
     <div class="label">Tổng vận đơn Viettel</div>
-    <div class="value">{{ total }}</div>
-    <div class="sub">trong trang hiện tại</div>
+    <div class="value">{{ total_items }}</div>
+    <div class="sub">{{ hien_tai }} dòng trong trang này</div>
   </div>
   <div class="stat">
     <div class="label">Chờ chốt PGH</div>
@@ -141,6 +142,8 @@
     </tbody>
   </table>
 </div>
+
+{{ phan_trang(page, total_pages, total_items, base_url, per_page) }}
 
 <!-- MODAL KINKIN LOOKUP -->
 <div id="kk-modal" class="kk-modal" aria-hidden="true">

@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -15,6 +15,8 @@ from app.services.kiem_tra_du_thong_tin import TRUONG_BAT_BUOC, kiem_tra, label_
 
 
 router = APIRouter(prefix="/pgh/cho-dien-thong-tin", tags=["cho-dien"])
+
+PER_PAGE = 10
 
 
 def _to_decimal(s: Optional[str]) -> Optional[Decimal]:
@@ -28,14 +30,33 @@ def _to_decimal(s: Optional[str]) -> Optional[Decimal]:
 
 
 @router.get("/", response_class=HTMLResponse)
-def trang_cho_dien(request: Request, session: Session = Depends(get_db)):
-    """List các phieu_giao_hang đang chờ điền + dòng nguồn."""
+def trang_cho_dien(
+    request: Request,
+    page: int = 1,
+    session: Session = Depends(get_db),
+):
+    """List các phieu_giao_hang đang chờ điền + dòng nguồn (phân trang 10/trang)."""
+    if page < 1:
+        page = 1
+
+    total = session.execute(
+        select(func.count())
+        .select_from(PhieuGiaoHang)
+        .where(PhieuGiaoHang.trang_thai_pgh == "cho_dien_thong_tin")
+    ).scalar() or 0
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    if page > total_pages:
+        page = total_pages
+    offset = (page - 1) * PER_PAGE
+
     rows = (
         session.execute(
             select(PhieuGiaoHang, DuLieuSheet)
             .join(DuLieuSheet, PhieuGiaoHang.du_lieu_sheet_id == DuLieuSheet.id)
             .where(PhieuGiaoHang.trang_thai_pgh == "cho_dien_thong_tin")
             .order_by(PhieuGiaoHang.id.desc())
+            .offset(offset)
+            .limit(PER_PAGE)
         )
         .all()
     )
@@ -67,6 +88,11 @@ def trang_cho_dien(request: Request, session: Session = Depends(get_db)):
             "request": request,
             "items": items,
             "truong_bat_buoc": TRUONG_BAT_BUOC,
+            "page": page,
+            "total_pages": total_pages,
+            "total_items": total,
+            "per_page": PER_PAGE,
+            "base_url": "/pgh/cho-dien-thong-tin/?",
         },
     )
 

@@ -1,0 +1,124 @@
+{# Reusable pagination control.
+   Usage:
+     {% from "_pagination.html" import phan_trang %}
+     {{ phan_trang(page, total_pages, total_items, base_url, per_page) }}
+
+   - page:        current page (1-indexed)
+   - total_pages: tổng số trang
+   - total_items: tổng số dòng (hiển thị "Hiển thị X-Y / total_items")
+   - base_url:    URL gốc với các filter hiện tại (kèm "?q=foo&" nếu có; macro sẽ append "page=N")
+   - per_page:    số dòng mỗi trang (để tính "Hiển thị X-Y")
+#}
+{% macro phan_trang(page, total_pages, total_items, base_url, per_page) %}
+{% if total_pages > 1 or total_items > per_page %}
+  <div class="pagination-wrap">
+    <div class="pagination-info muted">
+      Hiển thị
+      <strong>{{ ((page - 1) * per_page) + 1 }}</strong>–<strong>{{ [page * per_page, total_items]|min }}</strong>
+      / <strong>{{ total_items }}</strong> dòng
+    </div>
+    <nav class="pagination">
+      {% if page > 1 %}
+        <a class="pg-btn" href="{{ base_url }}page=1" title="Trang đầu">«</a>
+        <a class="pg-btn" href="{{ base_url }}page={{ page - 1 }}" title="Trang trước">‹</a>
+      {% else %}
+        <span class="pg-btn disabled">«</span>
+        <span class="pg-btn disabled">‹</span>
+      {% endif %}
+
+      {# Hiển thị tối đa 7 số trang quanh trang hiện tại #}
+      {% set window = 3 %}
+      {% set start = [1, page - window]|max %}
+      {% set end = [total_pages, page + window]|min %}
+      {% if start > 1 %}
+        <a class="pg-btn" href="{{ base_url }}page=1">1</a>
+        {% if start > 2 %}<span class="pg-ellipsis">…</span>{% endif %}
+      {% endif %}
+      {% for p in range(start, end + 1) %}
+        {% if p == page %}
+          <span class="pg-btn current">{{ p }}</span>
+        {% else %}
+          <a class="pg-btn" href="{{ base_url }}page={{ p }}">{{ p }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if end < total_pages %}
+        {% if end < total_pages - 1 %}<span class="pg-ellipsis">…</span>{% endif %}
+        <a class="pg-btn" href="{{ base_url }}page={{ total_pages }}">{{ total_pages }}</a>
+      {% endif %}
+
+      {% if page < total_pages %}
+        <a class="pg-btn" href="{{ base_url }}page={{ page + 1 }}" title="Trang sau">›</a>
+        <a class="pg-btn" href="{{ base_url }}page={{ total_pages }}" title="Trang cuối">»</a>
+      {% else %}
+        <span class="pg-btn disabled">›</span>
+        <span class="pg-btn disabled">»</span>
+      {% endif %}
+    </nav>
+  </div>
+
+  <style>
+    .pagination-wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin: 1rem 0 0;
+      padding: .75rem 1rem;
+      background: var(--kk-paper);
+      border: 1px solid var(--kk-line);
+      border-radius: var(--kk-radius);
+      flex-wrap: wrap;
+    }
+    .pagination-info { font-size: 12.5px; }
+    .pagination {
+      display: inline-flex;
+      gap: .2rem;
+      align-items: center;
+    }
+    .pg-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 .55rem;
+      border: 1px solid var(--kk-line);
+      border-radius: var(--kk-radius-sm);
+      background: var(--kk-paper);
+      color: var(--kk-ink-soft);
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .1s ease, border-color .1s ease, color .1s ease;
+      line-height: 1;
+    }
+    .pg-btn:hover:not(.disabled):not(.current) {
+      background: var(--kk-red-50);
+      border-color: var(--kk-red-200);
+      color: var(--kk-red);
+      text-decoration: none;
+    }
+    .pg-btn.current {
+      background: var(--kk-red);
+      border-color: var(--kk-red);
+      color: #fff;
+      font-weight: 600;
+    }
+    .pg-btn.disabled {
+      color: var(--kk-muted);
+      background: var(--kk-line-soft);
+      cursor: not-allowed;
+      opacity: .5;
+    }
+    .pg-ellipsis {
+      color: var(--kk-muted);
+      padding: 0 .25rem;
+      font-size: 13px;
+    }
+    @media (max-width: 640px) {
+      .pagination-wrap { flex-direction: column; align-items: stretch; }
+      .pagination { justify-content: center; flex-wrap: wrap; }
+    }
+  </style>
+{% endif %}
+{% endmacro %}

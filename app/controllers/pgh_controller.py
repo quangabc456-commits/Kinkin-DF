@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -16,11 +17,10 @@ from app.services.chot_pgh import tao_pgh_tu_dong_sheet
 
 router = APIRouter()
 
+PER_PAGE = 10
 
-def _query_van_don(session: Session, q: Optional[str], ngay: Optional[str]):
-    stmt = select(DuLieuSheet).order_by(
-        DuLieuSheet.ngay_chot.desc(), DuLieuSheet.sheet_row_index.asc()
-    )
+
+def _conds_van_don(q: Optional[str], ngay: Optional[str]) -> list:
     conds = [DuLieuSheet.phuong_thuc_gui.ilike("%viettel%")]
     if q:
         like = f"%{q}%"
@@ -31,8 +31,7 @@ def _query_van_don(session: Session, q: Optional[str], ngay: Optional[str]):
         )
     if ngay:
         conds.append(DuLieuSheet.ten_sheet == ngay)
-    stmt = stmt.where(and_(*conds))
-    return stmt
+    return conds
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -40,11 +39,32 @@ def trang_chu(
     request: Request,
     q: Optional[str] = None,
     ngay: Optional[str] = None,
-    limit: int = 100,
+    page: int = 1,
     session: Session = Depends(get_db),
 ):
-    stmt = _query_van_don(session, q, ngay).limit(limit)
+    if page < 1:
+        page = 1
+    conds = _conds_van_don(q, ngay)
+
+    total = session.execute(
+        select(func.count()).select_from(DuLieuSheet).where(and_(*conds))
+    ).scalar() or 0
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    if page > total_pages:
+        page = total_pages
+
+    offset = (page - 1) * PER_PAGE
+    stmt = (
+        select(DuLieuSheet)
+        .where(and_(*conds))
+        .order_by(DuLieuSheet.ngay_chot.desc(), DuLieuSheet.sheet_row_index.asc())
+        .offset(offset)
+        .limit(PER_PAGE)
+    )
     rows = session.execute(stmt).scalars().all()
+
+    base_params = {k: v for k, v in {"q": q, "ngay": ngay}.items() if v}
+    base_url = "/?" + (urlencode(base_params) + "&" if base_params else "")
 
     pgh_map: dict[int, PhieuGiaoHang] = {}
     if rows:
@@ -89,6 +109,11 @@ def trang_chu(
             "ngay": ngay or "",
             "days": days,
             "tai_khoans": tai_khoans,
+            "page": page,
+            "total_pages": total_pages,
+            "total_items": total,
+            "per_page": PER_PAGE,
+            "base_url": base_url,
         },
     )
 
