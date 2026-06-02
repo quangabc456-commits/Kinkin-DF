@@ -21,6 +21,8 @@ sheets_index.json
 sample_snapshot.json
 totals_per_day.json
 BOT- DF.json
+creds_b64.txt
+_gen_b64.py
 .DS_Store
 log*.txt
 logs/
