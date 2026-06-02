@@ -74,9 +74,9 @@ vercel login
 cd "c:\VScode\Kinkin - DF"
 vercel link
 ```
-Trả lời: Set up `c:\VScode\Kinkin - DF`? → **Y**, scope → `kin-kin-s-projects`, link tới existing project → **Y** (chọn `kinkin-df`), root directory → `.`
+Trả lời: Set up `c:\VScode\Kinkin - DF`? → **Y**, scope → `kin-kin`, link tới existing project → **Y** (chọn `kinkin-df`), root directory → `.`
 
-> **Lưu ý**: Project `kinkin-df` hiện gắn custom domain `kinkinlogistics-vtp.vercel.app`. Có thể deploy qua CLI (`vercel --prod`) hoặc qua GitHub auto-deploy nếu đã connect repo trên dashboard.
+> **Lưu ý**: Project `kinkin-df` ở team `kin-kin`, canonical domain `kinkin-df.vercel.app`. Deploy bằng `vercel --prod` từ thư mục đã link.
 
 ### 3.3 Set env vars
 Chạy từng lệnh sau, hoặc làm 1 lượt trên dashboard <https://vercel.com/dashboard/[project]/settings/environment-variables>:
@@ -115,7 +115,7 @@ vercel env add ENABLE_SYNC_UI production
 vercel --prod
 ```
 
-Sau ~1 phút sẽ có URL: `https://kinkinlogistics-vtp.vercel.app` (canonical domain hiện tại của project `kinkin-df`).
+Sau ~1 phút sẽ có URL: `https://kinkin-df.vercel.app` (canonical domain của project `kinkin-df` ở team `kin-kin`).
 
 ## Phase 4 — Verify production
 
