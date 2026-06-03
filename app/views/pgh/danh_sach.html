@@ -139,16 +139,7 @@
             {% elif not r.dia_chi_nguoi_nhan %}
               <span class="badge warn dot" title="Cần địa chỉ người nhận trước khi tạo PGH">Thiếu địa chỉ</span>
             {% else %}
-              <form method="post" action="/chot/{{ r.id }}" onsubmit="return confirm('Chốt PGH cho vận đơn {{ r.ma_van_don }}?')">
-                {% if tai_khoans|length > 1 %}
-                  <select name="tai_khoan_vtp_id" class="sm">
-                    {% for tk in tai_khoans %}
-                      <option value="{{ tk.id }}" {% if tk.mac_dinh %}selected{% endif %}>{{ tk.ten_hien_thi }}</option>
-                    {% endfor %}
-                  </select>
-                {% endif %}
-                <button class="btn sm" type="submit">Chốt PGH</button>
-              </form>
+              <a class="btn sm" href="/pgh/kho-den/{{ r.id }}" title="Mở màn hình điền thông tin tạo PGH kho đến">Tạo PGH kho đến</a>
             {% endif %}
           </td>
         </tr>
@@ -257,6 +248,39 @@
   }
   .kk-section__pill--warn { background: var(--kk-warn-bg); color: var(--kk-warn); }
   .kk-section__pill--err { background: var(--kk-error-bg); color: var(--kk-error); }
+
+  /* Tra cứu nhanh — query blocks */
+  .kk-q-actions { margin-bottom: .75rem; }
+  .kk-q-block {
+    background: var(--kk-paper);
+    border: 1px solid var(--kk-line);
+    border-radius: var(--kk-radius-sm);
+    margin-bottom: .55rem;
+    overflow: hidden;
+  }
+  .kk-q-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .4rem .65rem;
+    background: var(--kk-line-soft);
+    border-bottom: 1px solid var(--kk-line);
+  }
+  .kk-q-label {
+    font-size: 12px; font-weight: 600; color: var(--kk-ink-soft);
+    letter-spacing: .01em;
+  }
+  .kk-q-code {
+    margin: 0;
+    padding: .65rem .85rem;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--kk-ink);
+    background: #fafbfc;
+    white-space: pre;
+    overflow-x: auto;
+    border: 0;
+    border-radius: 0;
+  }
   .kk-grid {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem .85rem;
     background: var(--kk-line-soft);
@@ -419,7 +443,78 @@
         + '</section>');
     }
 
+    parts.push(buildTraCuuNhanhSection(currentCode, data.loai));
+
     body.innerHTML = parts.join('');
+  }
+
+  // Trả về 3 dạng query theo loại mã. Mỗi mã sẽ có "primary" (chính xác theo loại) +
+  // "broad" (OR qua 4 cột — phòng khi detect sai loai).
+  function buildTraCuuNhanhSection(code, loai) {
+    const q = code.replace(/'/g, "''");  // escape SQL single quote
+    const enc = encodeURIComponent(code);
+
+    let sqlChinh, alchemyChinh, mota;
+    switch (loai) {
+      case 'K':
+        mota = 'Tất cả dòng cùng mã kiện K';
+        sqlChinh = `SELECT * FROM du_lieu_sheet\nWHERE ma_kien_k = '${q}'\nORDER BY ngay_chot DESC, sheet_row_index;`;
+        alchemyChinh = `session.scalars(\n    select(DuLieuSheet)\n    .where(DuLieuSheet.ma_kien_k == "${code}")\n    .order_by(DuLieuSheet.ngay_chot.desc(), DuLieuSheet.sheet_row_index)\n).all()`;
+        break;
+      case 'F':
+        mota = 'Tất cả dòng có F cha hoặc thùng = mã này';
+        sqlChinh = `SELECT * FROM du_lieu_sheet\nWHERE ma_f_cha = '${q}' OR ma_thung = '${q}'\nORDER BY ngay_chot DESC, sheet_row_index;`;
+        alchemyChinh = `from sqlalchemy import or_\nsession.scalars(\n    select(DuLieuSheet).where(\n        or_(DuLieuSheet.ma_f_cha == "${code}",\n            DuLieuSheet.ma_thung == "${code}"))\n    .order_by(DuLieuSheet.ngay_chot.desc(), DuLieuSheet.sheet_row_index)\n).all()`;
+        break;
+      case 'GKA':
+      case 'VK':
+        mota = 'Đúng 1 dòng vận đơn này';
+        sqlChinh = `SELECT * FROM du_lieu_sheet WHERE ma_van_don = '${q}';`;
+        alchemyChinh = `session.scalar(\n    select(DuLieuSheet).where(DuLieuSheet.ma_van_don == "${code}")\n)`;
+        break;
+      case 'PGH':
+      case 'HD':
+        mota = 'PGH đã chốt với mã VTP này';
+        sqlChinh = `SELECT * FROM phieu_giao_hang WHERE ma_pgh_vtp = '${q}';`;
+        alchemyChinh = `session.scalar(\n    select(PhieuGiaoHang).where(PhieuGiaoHang.ma_pgh_vtp == "${code}")\n)`;
+        break;
+      default:
+        mota = 'Quét tất cả cột mã';
+        sqlChinh = `SELECT * FROM du_lieu_sheet\nWHERE ma_van_don = '${q}'\n   OR ma_thung = '${q}'\n   OR ma_f_cha = '${q}'\n   OR ma_kien_k = '${q}'\nORDER BY ngay_chot DESC;`;
+        alchemyChinh = `from sqlalchemy import or_\nsession.scalars(\n    select(DuLieuSheet).where(or_(\n        DuLieuSheet.ma_van_don == "${code}",\n        DuLieuSheet.ma_thung == "${code}",\n        DuLieuSheet.ma_f_cha == "${code}",\n        DuLieuSheet.ma_kien_k == "${code}")\n    ).order_by(DuLieuSheet.ngay_chot.desc())\n).all()`;
+    }
+
+    const sqlBroad = `-- Quét cả 4 cột mã (an toàn khi không chắc loại)\nSELECT ten_sheet, sheet_row_index, ma_kien_k, ma_f_cha, ma_thung, ma_van_don, ten_kh, phuong_thuc_gui, trang_thai_goc\nFROM du_lieu_sheet\nWHERE '${q}' IN (ma_kien_k, ma_f_cha, ma_thung, ma_van_don)\nORDER BY ngay_chot DESC, sheet_row_index;`;
+
+    const sqlCache = `-- Cache Kinkin đã sync cho mã này\nSELECT code, loai, ma_don_chinh, bill_code, trang_thai, ten_kho, warehouse_id, last_sync_luc, last_sync_loi\nFROM cache_kinkin_ma WHERE code = '${q}';`;
+
+    return '<section class="kk-section">'
+      + '<div class="kk-section__head">'
+      + '<h3 class="kk-section__title">🔍 Tra cứu nhanh</h3>'
+      + '<span class="kk-section__pill">' + escapeHtml(mota) + '</span>'
+      + '</div>'
+
+      + '<div class="kk-q-actions">'
+      + '<a class="btn ghost sm" href="/?q=' + enc + '">📋 Filter danh sách chính (q=' + escapeHtml(code) + ')</a>'
+      + '</div>'
+
+      + buildCodeBlock('SQL (paste vào Supabase SQL Editor)', sqlChinh)
+      + buildCodeBlock('SQL — quét rộng 4 cột', sqlBroad)
+      + buildCodeBlock('SQL — cache Kinkin', sqlCache)
+      + buildCodeBlock('SQLAlchemy (Python shell)', alchemyChinh)
+
+      + '</section>';
+  }
+
+  function buildCodeBlock(label, code) {
+    const id = 'q' + Math.random().toString(36).slice(2, 10);
+    return '<div class="kk-q-block">'
+      + '<div class="kk-q-head">'
+      + '<span class="kk-q-label">' + escapeHtml(label) + '</span>'
+      + '<button type="button" class="btn ghost sm" data-copy-target="' + id + '">📋 Copy</button>'
+      + '</div>'
+      + '<pre class="kk-q-code" id="' + id + '">' + escapeHtml(code) + '</pre>'
+      + '</div>';
   }
 
   document.addEventListener('click', e => {
@@ -444,6 +539,20 @@
           refreshBtn.textContent = '↻ Thử lại';
           alert('Lỗi refresh: ' + err);
         });
+      return;
+    }
+    const copyBtn = e.target.closest('[data-copy-target]');
+    if (copyBtn) {
+      const targetId = copyBtn.getAttribute('data-copy-target');
+      const pre = document.getElementById(targetId);
+      if (pre) {
+        navigator.clipboard.writeText(pre.textContent).then(() => {
+          const old = copyBtn.textContent;
+          copyBtn.textContent = '✓ Đã copy';
+          copyBtn.disabled = true;
+          setTimeout(() => { copyBtn.textContent = old; copyBtn.disabled = false; }, 1400);
+        });
+      }
       return;
     }
     if (e.target.matches('[data-modal-close]')) closeModal();
