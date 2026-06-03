@@ -31,14 +31,25 @@ def _trich_trang_thai(resp: Any) -> Optional[str]:
     return None
 
 
+def _min_ngay_chot() -> Optional[date]:
+    if not settings.CRON_WORKER_MIN_NGAY_CHOT:
+        return None
+    try:
+        return date.fromisoformat(settings.CRON_WORKER_MIN_NGAY_CHOT)
+    except ValueError:
+        return None
+
+
 def _rows_can_refresh(
     session: Session, batch: int, days_back: int
 ) -> list[DuLieuSheet]:
     cutoff = date.today() - timedelta(days=days_back)
+    min_ngay = _min_ngay_chot()
+    cutoff_eff = max(cutoff, min_ngay) if min_ngay else cutoff
     rows = session.execute(
         select(DuLieuSheet)
         .where(
-            DuLieuSheet.ngay_chot >= cutoff,
+            DuLieuSheet.ngay_chot >= cutoff_eff,
             DuLieuSheet.ma_van_don.is_not(None),
             or_(
                 DuLieuSheet.trang_thai_goc.is_(None),

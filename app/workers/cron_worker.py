@@ -37,6 +37,12 @@ def _chon_dong_viettel_chua_chot(
 ) -> list[DuLieuSheet]:
     """Dòng phuong_thuc_gui ILIKE '%viettel%' và chưa có PGH ma_pgh_vtp."""
     cutoff = date.today() - timedelta(days=days_back)
+    if settings.CRON_WORKER_MIN_NGAY_CHOT:
+        try:
+            min_ngay = date.fromisoformat(settings.CRON_WORKER_MIN_NGAY_CHOT)
+            cutoff = max(cutoff, min_ngay)
+        except ValueError:
+            pass
     pgh_subq = (
         select(PhieuGiaoHang.du_lieu_sheet_id)
         .where(PhieuGiaoHang.ma_pgh_vtp.is_not(None))

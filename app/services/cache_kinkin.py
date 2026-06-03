@@ -199,10 +199,16 @@ def chon_codes_can_refresh(
     session: Session, batch: int, days_back: int, stale_hours: int = 6
 ) -> list[str]:
     """Lấy danh sách mã unique cần refresh:
-       - Có trong du_lieu_sheet với ngay_chot >= today - days_back
+       - Có trong du_lieu_sheet với ngay_chot >= max(today - days_back, CRON_WORKER_MIN_NGAY_CHOT)
        - Chưa có trong cache_kinkin_ma HOẶC last_sync_luc > stale_hours.
     """
     cutoff_date = date.today() - timedelta(days=days_back)
+    if settings.CRON_WORKER_MIN_NGAY_CHOT:
+        try:
+            min_ngay = date.fromisoformat(settings.CRON_WORKER_MIN_NGAY_CHOT)
+            cutoff_date = max(cutoff_date, min_ngay)
+        except ValueError:
+            pass
     cutoff_sync = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
 
     sub_recent = (

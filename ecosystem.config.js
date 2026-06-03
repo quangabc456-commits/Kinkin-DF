@@ -1,4 +1,7 @@
-// PM2 ecosystem cho local worker.
+// PM2 ecosystem cho local worker của project Kinkin-DF.
+//
+// Tên PM2 process: kkdf-cron (đặt riêng để phân biệt với worker của project
+// Kinkinwarehouse — `kk-cron-local` — đang chạy cùng máy).
 //
 // Cài PM2 1 lần:
 //   npm i -g pm2 pm2-windows-startup
@@ -10,20 +13,25 @@
 //
 // Theo dõi:
 //   pm2 status
-//   pm2 logs kinkin-cron-worker
+//   pm2 logs kkdf-cron
 //   pm2 monit
 //
 // Update sau khi sửa script:
-//   pm2 reload kinkin-cron-worker
+//   pm2 reload kkdf-cron
 //
 // Tắt:
-//   pm2 stop kinkin-cron-worker
+//   pm2 stop kkdf-cron
+//   pm2 delete kkdf-cron
+//
+// Migrate từ tên cũ (kinkin-cron-worker):
 //   pm2 delete kinkin-cron-worker
+//   pm2 start ecosystem.config.js
+//   pm2 save
 
 module.exports = {
   apps: [
     {
-      name: "kinkin-cron-worker",
+      name: "kkdf-cron",
       script: ".venv/Scripts/python.exe",
       args: "-m app.workers.cron_worker",
       cwd: __dirname,
@@ -35,8 +43,8 @@ module.exports = {
         PYTHONIOENCODING: "utf-8",
         PYTHONUNBUFFERED: "1",
       },
-      out_file: "./logs/cron-worker.out.log",
-      error_file: "./logs/cron-worker.err.log",
+      out_file: "./logs/kkdf-cron.out.log",
+      error_file: "./logs/kkdf-cron.err.log",
       merge_logs: true,
       time: true,
     },

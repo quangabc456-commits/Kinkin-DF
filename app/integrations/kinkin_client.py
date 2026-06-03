@@ -13,9 +13,48 @@ SCOPE = "Identity KinkinCore KinkinReport offline_access WarehouseDeparture Ware
 CLIENT_ID = "Kinkin"
 CLIENT_SECRET = "KinkinAPP"
 
+HTTP_TIMEOUT = 90.0     # cron worker hay gặp ReadTimeout với 30s khi Kinkin chậm/503
+HTTP_RETRIES = 2        # số lần retry cho transient errors (timeout, 5xx, network)
+RETRY_BACKOFF_S = 1.5   # backoff cấp số nhân: 1.5s, 3s, 6s
+
 
 class KinkinError(Exception):
     pass
+
+
+def _retry_call(func):
+    """Decorator: retry httpx call với backoff khi gặp timeout/5xx."""
+    import functools
+    import time as _t
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        last_exc: Exception | None = None
+        delay = RETRY_BACKOFF_S
+        for attempt in range(HTTP_RETRIES + 1):
+            try:
+                return func(*args, **kwargs)
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                last_exc = e
+                if attempt >= HTTP_RETRIES:
+                    raise KinkinError(
+                        f"{func.__name__} timeout/network sau {attempt + 1} lần: {e}"
+                    ) from e
+            except KinkinError as e:
+                msg = str(e)
+                if " 5" in msg or "503" in msg or "502" in msg or "504" in msg:
+                    last_exc = e
+                    if attempt >= HTTP_RETRIES:
+                        raise
+                else:
+                    raise
+            _t.sleep(delay)
+            delay *= 2
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("unreachable")
+
+    return wrapper
 
 
 _token_lock = threading.Lock()
@@ -48,7 +87,7 @@ def _lay_token(force_refresh: bool = False) -> str:
             "username": settings.KK_USERNAME,
             "password": settings.KK_PASSWORD,
         }
-        with httpx.Client(base_url=settings.KK_BASE_IDENTITY, timeout=30.0) as c:
+        with httpx.Client(base_url=settings.KK_BASE_IDENTITY, timeout=HTTP_TIMEOUT) as c:
             r = c.post(
                 "/connect/token",
                 data=body,
@@ -80,18 +119,20 @@ def _headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {_lay_token()}", "Content-Type": "application/json"}
 
 
+@_retry_call
 def _post(base: str, path: str, body: dict, *, custom_headers: Optional[dict] = None) -> dict:
     h = custom_headers if custom_headers is not None else _headers()
-    with httpx.Client(base_url=base, timeout=30.0) as c:
+    with httpx.Client(base_url=base, timeout=HTTP_TIMEOUT) as c:
         r = c.post(path, json=body, headers=h)
     if r.status_code != 200:
         raise KinkinError(f"POST {path} {r.status_code}: {r.text[:300]}")
     return r.json()
 
 
+@_retry_call
 def _get(base: str, path: str, params: dict, *, custom_headers: Optional[dict] = None) -> dict:
     h = custom_headers if custom_headers is not None else _headers()
-    with httpx.Client(base_url=base, timeout=30.0) as c:
+    with httpx.Client(base_url=base, timeout=HTTP_TIMEOUT) as c:
         r = c.get(path, params=params, headers=h)
     if r.status_code != 200:
         raise KinkinError(f"GET {path} {r.status_code}: {r.text[:300]}")

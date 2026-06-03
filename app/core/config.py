@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     CRON_WORKER_BATCH: int = 50
     CRON_WORKER_REFRESH_DAYS: int = 7
     CRON_WORKER_DRY_RUN: bool = False
+    CRON_WORKER_MIN_NGAY_CHOT: str = "2026-01-01"  # chỉ xử lý phiếu có ngay_chot >= ngày này (rỗng = không filter)
 
     DEFAULT_KHO_DEN_ID: str = "5"
     MIN_DIA_CHI_LEN: int = 15
