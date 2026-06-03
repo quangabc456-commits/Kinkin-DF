@@ -249,38 +249,45 @@
   .kk-section__pill--warn { background: var(--kk-warn-bg); color: var(--kk-warn); }
   .kk-section__pill--err { background: var(--kk-error-bg); color: var(--kk-error); }
 
-  /* Tra cứu nhanh — query blocks */
-  .kk-q-actions { margin-bottom: .75rem; }
-  .kk-q-block {
-    background: var(--kk-paper);
+  /* Tra cứu nhanh — bảng kết quả Việt hoá */
+  .kk-q-actions { margin-bottom: .65rem; display: flex; gap: .4rem; flex-wrap: wrap; }
+  .kk-q-table-wrap {
     border: 1px solid var(--kk-line);
     border-radius: var(--kk-radius-sm);
-    margin-bottom: .55rem;
-    overflow: hidden;
-  }
-  .kk-q-head {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: .4rem .65rem;
-    background: var(--kk-line-soft);
-    border-bottom: 1px solid var(--kk-line);
-  }
-  .kk-q-label {
-    font-size: 12px; font-weight: 600; color: var(--kk-ink-soft);
-    letter-spacing: .01em;
-  }
-  .kk-q-code {
-    margin: 0;
-    padding: .65rem .85rem;
-    font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
-    font-size: 12px;
-    line-height: 1.55;
-    color: var(--kk-ink);
-    background: #fafbfc;
-    white-space: pre;
     overflow-x: auto;
-    border: 0;
-    border-radius: 0;
+    background: var(--kk-paper);
   }
+  .kk-q-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12.5px;
+  }
+  .kk-q-table thead th {
+    background: var(--kk-line-soft);
+    color: var(--kk-ink-soft);
+    font-weight: 600;
+    text-align: left;
+    padding: .4rem .55rem;
+    border-bottom: 1px solid var(--kk-line);
+    white-space: nowrap;
+    font-size: 11.5px;
+    letter-spacing: .01em;
+    position: sticky;
+    top: 0;
+  }
+  .kk-q-table tbody td {
+    padding: .35rem .55rem;
+    border-bottom: 1px solid var(--kk-line-soft);
+    vertical-align: top;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kk-q-table tbody td:hover { white-space: normal; word-break: break-word; }
+  .kk-q-table tbody tr:last-child td { border-bottom: 0; }
+  .kk-q-table tbody tr:hover { background: var(--kk-red-50); }
   .kk-grid {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem .85rem;
     background: var(--kk-line-soft);
@@ -443,78 +450,98 @@
         + '</section>');
     }
 
-    parts.push(buildTraCuuNhanhSection(currentCode, data.loai));
-
-    body.innerHTML = parts.join('');
-  }
-
-  // Trả về 3 dạng query theo loại mã. Mỗi mã sẽ có "primary" (chính xác theo loại) +
-  // "broad" (OR qua 4 cột — phòng khi detect sai loai).
-  function buildTraCuuNhanhSection(code, loai) {
-    const q = code.replace(/'/g, "''");  // escape SQL single quote
-    const enc = encodeURIComponent(code);
-
-    let sqlChinh, alchemyChinh, mota;
-    switch (loai) {
-      case 'K':
-        mota = 'Tất cả dòng cùng mã kiện K';
-        sqlChinh = `SELECT * FROM du_lieu_sheet\nWHERE ma_kien_k = '${q}'\nORDER BY ngay_chot DESC, sheet_row_index;`;
-        alchemyChinh = `session.scalars(\n    select(DuLieuSheet)\n    .where(DuLieuSheet.ma_kien_k == "${code}")\n    .order_by(DuLieuSheet.ngay_chot.desc(), DuLieuSheet.sheet_row_index)\n).all()`;
-        break;
-      case 'F':
-        mota = 'Tất cả dòng có F cha hoặc thùng = mã này';
-        sqlChinh = `SELECT * FROM du_lieu_sheet\nWHERE ma_f_cha = '${q}' OR ma_thung = '${q}'\nORDER BY ngay_chot DESC, sheet_row_index;`;
-        alchemyChinh = `from sqlalchemy import or_\nsession.scalars(\n    select(DuLieuSheet).where(\n        or_(DuLieuSheet.ma_f_cha == "${code}",\n            DuLieuSheet.ma_thung == "${code}"))\n    .order_by(DuLieuSheet.ngay_chot.desc(), DuLieuSheet.sheet_row_index)\n).all()`;
-        break;
-      case 'GKA':
-      case 'VK':
-        mota = 'Đúng 1 dòng vận đơn này';
-        sqlChinh = `SELECT * FROM du_lieu_sheet WHERE ma_van_don = '${q}';`;
-        alchemyChinh = `session.scalar(\n    select(DuLieuSheet).where(DuLieuSheet.ma_van_don == "${code}")\n)`;
-        break;
-      case 'PGH':
-      case 'HD':
-        mota = 'PGH đã chốt với mã VTP này';
-        sqlChinh = `SELECT * FROM phieu_giao_hang WHERE ma_pgh_vtp = '${q}';`;
-        alchemyChinh = `session.scalar(\n    select(PhieuGiaoHang).where(PhieuGiaoHang.ma_pgh_vtp == "${code}")\n)`;
-        break;
-      default:
-        mota = 'Quét tất cả cột mã';
-        sqlChinh = `SELECT * FROM du_lieu_sheet\nWHERE ma_van_don = '${q}'\n   OR ma_thung = '${q}'\n   OR ma_f_cha = '${q}'\n   OR ma_kien_k = '${q}'\nORDER BY ngay_chot DESC;`;
-        alchemyChinh = `from sqlalchemy import or_\nsession.scalars(\n    select(DuLieuSheet).where(or_(\n        DuLieuSheet.ma_van_don == "${code}",\n        DuLieuSheet.ma_thung == "${code}",\n        DuLieuSheet.ma_f_cha == "${code}",\n        DuLieuSheet.ma_kien_k == "${code}")\n    ).order_by(DuLieuSheet.ngay_chot.desc())\n).all()`;
-    }
-
-    const sqlBroad = `-- Quét cả 4 cột mã (an toàn khi không chắc loại)\nSELECT ten_sheet, sheet_row_index, ma_kien_k, ma_f_cha, ma_thung, ma_van_don, ten_kh, phuong_thuc_gui, trang_thai_goc\nFROM du_lieu_sheet\nWHERE '${q}' IN (ma_kien_k, ma_f_cha, ma_thung, ma_van_don)\nORDER BY ngay_chot DESC, sheet_row_index;`;
-
-    const sqlCache = `-- Cache Kinkin đã sync cho mã này\nSELECT code, loai, ma_don_chinh, bill_code, trang_thai, ten_kho, warehouse_id, last_sync_luc, last_sync_loi\nFROM cache_kinkin_ma WHERE code = '${q}';`;
-
-    return '<section class="kk-section">'
+    // Section "Tra cứu nhanh" — placeholder rồi fetch async
+    parts.push('<section class="kk-section" id="tra-cuu-section">'
       + '<div class="kk-section__head">'
       + '<h3 class="kk-section__title">🔍 Tra cứu nhanh</h3>'
-      + '<span class="kk-section__pill">' + escapeHtml(mota) + '</span>'
+      + '<span class="kk-section__pill">đang tải…</span>'
       + '</div>'
+      + '<div id="tra-cuu-content" class="muted" style="padding:.5rem 0;">⏳ Đang truy vấn DB…</div>'
+      + '</section>');
 
-      + '<div class="kk-q-actions">'
-      + '<a class="btn ghost sm" href="/?q=' + enc + '">📋 Filter danh sách chính (q=' + escapeHtml(code) + ')</a>'
-      + '</div>'
+    body.innerHTML = parts.join('');
 
-      + buildCodeBlock('SQL (paste vào Supabase SQL Editor)', sqlChinh)
-      + buildCodeBlock('SQL — quét rộng 4 cột', sqlBroad)
-      + buildCodeBlock('SQL — cache Kinkin', sqlCache)
-      + buildCodeBlock('SQLAlchemy (Python shell)', alchemyChinh)
-
-      + '</section>';
+    // Async fetch results
+    fetch('/api/kinkin/tra-cuu/' + encodeURIComponent(currentCode))
+      .then(r => r.json())
+      .then(d => renderTraCuu(d, currentCode))
+      .catch(err => {
+        const el = document.getElementById('tra-cuu-content');
+        if (el) el.innerHTML = '<div class="kk-err">⚠ Lỗi tra cứu: ' + escapeHtml(err.message || String(err)) + '</div>';
+      });
   }
 
-  function buildCodeBlock(label, code) {
-    const id = 'q' + Math.random().toString(36).slice(2, 10);
-    return '<div class="kk-q-block">'
-      + '<div class="kk-q-head">'
-      + '<span class="kk-q-label">' + escapeHtml(label) + '</span>'
-      + '<button type="button" class="btn ghost sm" data-copy-target="' + id + '">📋 Copy</button>'
-      + '</div>'
-      + '<pre class="kk-q-code" id="' + id + '">' + escapeHtml(code) + '</pre>'
+  // Vietnamese column labels theo bảng
+  const COLS_DU_LIEU_SHEET = [
+    { key: 'ten_sheet',          label: 'Sheet' },
+    { key: 'ngay_chot',          label: 'Ngày chốt' },
+    { key: 'ma_kien_k',          label: 'Mã kiện K' },
+    { key: 'ma_f_cha',           label: 'Mã F cha' },
+    { key: 'ma_thung',           label: 'Mã thùng' },
+    { key: 'ma_van_don',         label: 'Mã vận đơn' },
+    { key: 'ten_kh',             label: 'Khách hàng' },
+    { key: 'sdt_nguoi_nhan',     label: 'SĐT người nhận' },
+    { key: 'dia_chi_nguoi_nhan', label: 'Địa chỉ người nhận' },
+    { key: 'phuong_thuc_gui',    label: 'PT gửi' },
+    { key: 'can_nang_kg',        label: 'Cân (kg)' },
+    { key: 'trang_thai_goc',     label: 'Trạng thái gốc' },
+  ];
+
+  const COLS_PHIEU_GIAO_HANG = [
+    { key: 'ma_pgh_vtp',         label: 'Mã PGH VTP' },
+    { key: 'ma_pgh_kinkin',      label: 'Mã PGH Kinkin' },
+    { key: 'ma_pgh_noi_bo',      label: 'Mã PGH nội bộ' },
+    { key: 'trang_thai_pgh',     label: 'Trạng thái VTP' },
+    { key: 'trang_thai_kinkin',  label: 'Trạng thái Kinkin' },
+    { key: 'kho_den_id',         label: 'Kho đến' },
+    { key: 'nguoi_nhan_ten',     label: 'Người nhận' },
+    { key: 'nguoi_nhan_sdt',     label: 'SĐT' },
+    { key: 'nguoi_nhan_dia_chi', label: 'Địa chỉ nhận' },
+    { key: 'cuoc_tong_vnd',      label: 'Cước (đ)', format: 'money' },
+    { key: 'chot_luc',           label: 'Chốt lúc', format: 'dt' },
+    { key: 'loi_message',        label: 'Lỗi' },
+  ];
+
+  function formatCell(value, fmt) {
+    if (value == null || value === '') return '<span class="muted">—</span>';
+    if (fmt === 'money') return escapeHtml(fmtMoney(value) || value);
+    if (fmt === 'dt') return escapeHtml(fmtDt(value) || value);
+    return escapeHtml(String(value));
+  }
+
+  function renderTraCuu(d, currentCode) {
+    const section = document.getElementById('tra-cuu-section');
+    const head = section ? section.querySelector('.kk-section__head .kk-section__pill') : null;
+    const content = document.getElementById('tra-cuu-content');
+    if (!content) return;
+
+    if (head) head.textContent = (d.mota || ('loại: ' + d.loai)) + ' • ' + d.tong + ' kết quả';
+
+    const cols = d.bang === 'phieu_giao_hang' ? COLS_PHIEU_GIAO_HANG : COLS_DU_LIEU_SHEET;
+
+    const actions = '<div class="kk-q-actions">'
+      + '<a class="btn ghost sm" href="/?q=' + encodeURIComponent(currentCode) + '">📋 Filter danh sách chính</a>'
+      + '<button type="button" class="btn ghost sm" data-refresh-code="' + escapeHtml(currentCode) + '" title="Pull lại từ Kinkin">↻ Refresh cache</button>'
       + '</div>';
+
+    if (!d.rows || d.rows.length === 0) {
+      content.innerHTML = actions + '<div class="muted" style="padding:.6rem 0;">Không có dòng nào khớp trong DB.</div>';
+      return;
+    }
+
+    let html = actions + '<div class="kk-q-table-wrap"><table class="kk-q-table"><thead><tr>';
+    for (const c of cols) html += '<th>' + escapeHtml(c.label) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (const row of d.rows) {
+      html += '<tr>';
+      for (const c of cols) html += '<td>' + formatCell(row[c.key], c.format) + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    if (d.tong >= d.gioi_han) {
+      html += '<div class="muted" style="font-size:11px; margin-top:.3rem;">⚠ Đạt giới hạn ' + d.gioi_han + ' dòng. Để xem hết: bấm "Filter danh sách chính".</div>';
+    }
+    content.innerHTML = html;
   }
 
   document.addEventListener('click', e => {
@@ -539,20 +566,6 @@
           refreshBtn.textContent = '↻ Thử lại';
           alert('Lỗi refresh: ' + err);
         });
-      return;
-    }
-    const copyBtn = e.target.closest('[data-copy-target]');
-    if (copyBtn) {
-      const targetId = copyBtn.getAttribute('data-copy-target');
-      const pre = document.getElementById(targetId);
-      if (pre) {
-        navigator.clipboard.writeText(pre.textContent).then(() => {
-          const old = copyBtn.textContent;
-          copyBtn.textContent = '✓ Đã copy';
-          copyBtn.disabled = true;
-          setTimeout(() => { copyBtn.textContent = old; copyBtn.disabled = false; }, 1400);
-        });
-      }
       return;
     }
     if (e.target.matches('[data-modal-close]')) closeModal();
