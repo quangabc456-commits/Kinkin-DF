@@ -4,7 +4,7 @@
 
 <div class="row between" style="margin-bottom:1rem;">
   <div>
-    <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.05em;">Tạo phiếu giao hàng · Kho đến (dion.vn)</div>
+    <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.05em;">Tạo phiếu giao hàng · Kho đến (vanchuyenkinkin.com)</div>
     <h1 style="margin:.2rem 0 0; font-size:20px; letter-spacing:-.01em;">
       Vận đơn <code style="font-size:16px;">{{ ds.ma_van_don }}</code>
     </h1>
@@ -41,13 +41,34 @@
     <div class="card">
       <div class="card-title">👤 Khách hàng (hệ kho đến)</div>
       <form method="get" action="/pgh/kho-den/{{ ds.id }}" class="row" style="gap:.5rem; margin-bottom:.6rem;">
-        <input type="text" name="customer_code" value="{{ customer_code }}" placeholder="Mã khách, vd 093HN-VAT" style="flex:1; min-width:160px;">
+        <input type="text" id="kh-input" name="customer_code" value="{{ customer_code }}"
+               placeholder="Gõ tên hoặc mã khách… (vd Nguyễn / 093HN-VAT)"
+               list="dl-khach" autocomplete="off" style="flex:1; min-width:180px;">
+        <datalist id="dl-khach"></datalist>
         <button class="btn sm" type="submit">Tra khách</button>
       </form>
 
+      {% if candidates %}
+        <div class="muted" style="margin-bottom:.4rem;">Tìm thấy <strong>{{ candidates|length }}</strong> khách khớp — chọn 1:</div>
+        <div class="table-wrap" style="max-height:240px; margin-bottom:.4rem;">
+          <table>
+            <thead><tr><th>Mã</th><th>Tên</th><th>SĐT</th></tr></thead>
+            <tbody>
+              {% for c in candidates %}
+                <tr style="cursor:pointer;" onclick="window.location='/pgh/kho-den/{{ ds.id }}?customer_code={{ c.code|urlencode }}'">
+                  <td class="nowrap"><code>{{ c.code }}</code></td>
+                  <td>{{ c.name or '—' }}</td>
+                  <td class="nowrap">{{ c.phone or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
       {% if loi_khach %}
         <div class="badge warn dot">{{ loi_khach }}</div>
-        <div class="muted" style="margin-top:.4rem;">Nhập đúng mã khách rồi bấm <strong>Tra khách</strong>.</div>
+        <div class="muted" style="margin-top:.4rem;">Gõ tên hoặc mã khách rồi bấm <strong>Tra khách</strong> (gợi ý hiện khi gõ ≥ 2 ký tự).</div>
       {% elif khach %}
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:.4rem .85rem; font-size:13px;">
           <div><label>Mã khách</label><div><code>{{ khach.code }}</code></div></div>
@@ -301,6 +322,30 @@
   }
   khoden_toggleAddr();
   khoden_toggleVtp();
+
+  // Typeahead tra khách từ DB cache (kd_khach_hang) — gõ tên/mã, không cần token
+  (function () {
+    var inp = document.getElementById('kh-input');
+    var dl = document.getElementById('dl-khach');
+    if (!inp || !dl) return;
+    var timer = null;
+    inp.addEventListener('input', function () {
+      var q = inp.value.trim();
+      if (q.length < 2) return;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        fetch('/pgh/kho-den/api/khach?q=' + encodeURIComponent(q))
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (rows) {
+            dl.innerHTML = rows.map(function (k) {
+              var label = (k.name || '') + (k.phone ? ' · ' + k.phone : '');
+              return '<option value="' + (k.code || '') + '">' + label + '</option>';
+            }).join('');
+          })
+          .catch(function () {});
+      }, 200);
+    });
+  })();
 </script>
 
 {% endblock %}

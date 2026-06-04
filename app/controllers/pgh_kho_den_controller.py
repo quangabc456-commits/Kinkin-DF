@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from app.integrations import quanly_client as qc
 from app.integrations.khoden_client import KhodenError
 from app.integrations.quanly_client import QuanlyError
 from app.models import DuLieuSheet, PhieuGiaoHang
+from app.services import kho_den_ref_doc as doc
 from app.services.tao_pgh_hop_nhat import luu_ket_qua
 from app.services.tao_pgh_kho_den import (
     KhoDenServiceError,
@@ -42,6 +43,16 @@ def _can_nang_float(ds: DuLieuSheet) -> float:
         return 0.0
 
 
+@router.get("/api/khach", response_class=JSONResponse)
+def api_tim_khach(q: str = "", session: Session = Depends(get_db)):
+    """Typeahead tra khách từ DB cache (kd_khach_hang) — nhanh, không cần token.
+
+    Trả [{code, name, phone}] để datalist gợi ý. value = code (submit lại resolve chính xác).
+    """
+    rows = doc.tim_khach(session, q, limit=25)
+    return [{"code": r["code"], "name": r["name"], "phone": r["phone"]} for r in rows]
+
+
 @router.get("/{ds_id}", response_class=HTMLResponse)
 def form_tao_pgh(
     ds_id: int,
@@ -59,6 +70,7 @@ def form_tao_pgh(
         "ds": ds,
         "customer_code": code,
         "khach": None,
+        "candidates": [],
         "addresses": [],
         "packages": [],
         "tinhs": [],
@@ -71,41 +83,46 @@ def form_tao_pgh(
         "loi_kien": None,
     }
 
-    # Tra khách trên hệ kho đến (cần token vanchuyenkinkin.com — hệ thật)
-    try:
-        khach = kc.lay_customer_id(code) if code else None
-    except KhodenError as e:
-        ctx["loi_cau_hinh"] = str(e)
-        return templates.TemplateResponse("pgh/kho_den_form.html", ctx)
+    # ===== Tra khách từ DB cache (kd_khach_hang) — KHÔNG cần token, nhanh =====
+    khach = None
+    if code:
+        khach = doc.lay_khach_theo_code(session, code)  # khớp mã chính xác
+        if khach is None:
+            matches = doc.tim_khach(session, code, limit=25)  # tìm theo tên/mã/sđt
+            if len(matches) == 1:
+                khach = matches[0]
+            elif len(matches) > 1:
+                ctx["candidates"] = matches  # nhiều khớp → cho user chọn
+            else:
+                ctx["loi_khach"] = (
+                    f"Không tìm thấy khách khớp {code!r} trong cache. "
+                    "Gõ tên/mã khác, hoặc chạy đồng bộ khách (sync kho đến)."
+                )
 
-    if khach is None:
-        if code:
-            ctx["loi_khach"] = f"Không tìm thấy khách mã {code!r} trên hệ kho đến."
-    else:
+    if khach is not None:
         ctx["khach"] = khach
-        try:
-            ctx["addresses"] = kc.lay_dia_chi_cua_khach(khach["id"])
-        except KhodenError as e:
-            ctx["loi_dia_chi"] = str(e)
+        # Địa chỉ đã có: đọc cache trước (nhanh). Cache trống cho khách này → thử live
+        # (cache địa chỉ chưa đầy đủ); thiếu token thì bỏ qua, KHÔNG chặn trang.
+        ctx["addresses"] = doc.dia_chi_cua_khach(session, khach["id"])
+        if not ctx["addresses"]:
+            try:
+                ctx["addresses"] = kc.lay_dia_chi_cua_khach(khach["id"])
+            except KhodenError:
+                pass
+        # Kiện F: GIỮ LIVE (volatile) — cần token; thiếu token → báo ở ô kiện, không chặn cả trang
         try:
             ctx["packages"] = kc.ds_kien_f(khach.get("code") or code)
         except KhodenError as e:
             ctx["loi_kien"] = str(e)
 
-    # Danh sách tỉnh (gợi ý cho luồng địa chỉ mới)
-    try:
-        ctx["tinhs"] = kc.ds_tinh()
-    except KhodenError:
-        ctx["tinhs"] = []
-    # Đối tác vận chuyển (VTP) qua GATEWAY quanly (1-call hợp nhất) + kho
+    # Tỉnh + kho: đọc từ cache (cho datalist / select kho gửi)
+    ctx["tinhs"] = doc.ds_tinh(session)
+    ctx["khos"] = doc.ds_kho(session)
+    # Đối tác VTP qua gateway (1-call). Thiếu token → fallback list tĩnh để form vẫn render.
     try:
         ctx["doi_tac"] = qc.ds_doi_tac()
     except (QuanlyError, KhodenError):
-        ctx["doi_tac"] = []
-    try:
-        ctx["khos"] = kc.ds_kho()
-    except KhodenError:
-        ctx["khos"] = []
+        ctx["doi_tac"] = [{"id": settings.VIETTELPOST_PARTNER_ID, "name": "Viettel Post"}]
 
     return templates.TemplateResponse("pgh/kho_den_form.html", ctx)
 
