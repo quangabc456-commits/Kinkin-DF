@@ -1,4 +1,4 @@
-"""Client cho hệ KHO ĐẾN (*.dion.vn) — RIÊNG với kinkin_client (*.vanchuyenkinkin.com).
+"""Client cho hệ KHO ĐẾN — hệ THẬT *.vanchuyenkinkin.com (trước đây TEST *.dion.vn).
 
 3 host (xem docs/kho-den-api.md):
   - identity  : KK_BASE_KHODEN_IDENTITY  /connect/token
@@ -41,7 +41,7 @@ def _co_cau_hinh() -> None:
     if not settings.KK_KHODEN_USERNAME or not settings.KK_KHODEN_PASSWORD:
         raise KhodenError(
             "Thiếu KK_KHODEN_USERNAME / KK_KHODEN_PASSWORD trong .env "
-            "(tài khoản hệ kho đến *.dion.vn)."
+            "(tài khoản hệ kho đến *.vanchuyenkinkin.com — hệ THẬT; tài khoản dion.vn TEST không dùng được)."
         )
 
 
@@ -159,6 +159,30 @@ def ds_xa(district_id: str) -> list[dict]:
     return data.get("data") or []
 
 
+# ===== Core: quốc gia / kho / khách (bulk cho sync reference) =====
+
+def ds_quoc_gia() -> list[dict]:
+    """GET nactions/get-all → [{id, name}] (VIETNAM id = NATION_VIETNAM_ID)."""
+    data = _get(settings.KK_BASE_KHODEN_CORE, "/kinkincore/api/nactions/get-all", {})
+    return data.get("data") if isinstance(data, dict) else (data or [])
+
+
+def ds_kho() -> list[dict]:
+    """GET warehouse/get-list → [{id, name, code, ...}]."""
+    data = _get(settings.KK_BASE_KHODEN_CORE, "/kinkincore/api/warehouse/get-list", {})
+    return data.get("data") if isinstance(data, dict) else (data or [])
+
+
+def ds_khach_all(page: int = 1, page_size: int = 500) -> dict:
+    """POST customer/get-list → trang khách (bulk). Trả nguyên {data, total} (best-effort;
+    body/envelope cần xác minh trên hệ thật)."""
+    return _post(
+        settings.KK_BASE_KHODEN_CORE,
+        "/kinkincore/api/customer/get-list",
+        {"page": page, "pageSize": page_size},
+    )
+
+
 # ===== Kho đến: địa chỉ nhận =====
 
 def ds_dia_chi(page: int = 1, page_size: int = 200, type_: Optional[int] = None) -> dict:
@@ -195,6 +219,44 @@ def tao_dia_chi(body: dict) -> dict:
     return _post(settings.KK_BASE_KHODEN, "/warehouseexport/api/deliveryAddress/save", body)
 
 
+# ===== Kho đến: kiện F (chọn lên PGH) =====
+
+def ds_kien_f(
+    customer_code: str,
+    warehouse_id: Optional[int] = None,
+    package_f_status: int = 0,
+    package_f_name: str = "",
+    page: int = 1,
+    page_size: int = 200,
+) -> list[dict]:
+    """POST packageF/common/get-list-paginate → danh sách kiện F của khách.
+
+    package_f_status=0 → mọi trạng thái (lọc/hiển thị client theo currentPackageFStatus).
+    Item: {packageFId, packageFCode, packageFName(F…), currentPackageFStatus,
+           packageFStatusName, packageFWeight, ...}. codeTracking lên PGH = packageFCode.
+    """
+    wh = warehouse_id if warehouse_id is not None else int(settings.DEFAULT_KHO_DEN_ID or 5)
+    data = _post(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/packageF/common/get-list-paginate",
+        {
+            "warehouseId": wh,
+            "packageFStatus": package_f_status,
+            "customerCode": customer_code,
+            "packageFName": package_f_name,
+            "packageFFilterDate": None,
+            "page": page,
+            "pageSize": page_size,
+            "sortField": "",
+            "sortOrder": "ASC",
+        },
+    )
+    payload = data.get("data")
+    if isinstance(payload, dict):
+        return payload.get("items") or payload.get("data") or []
+    return payload or []
+
+
 # ===== Kho đến: PGH =====
 
 def tao_pgh(body: dict) -> dict:
@@ -202,6 +264,137 @@ def tao_pgh(body: dict) -> dict:
     return _post(
         settings.KK_BASE_KHODEN, "/warehouseexport/api/deliveryorders/add-update-delivery", body
     )
+
+
+def tim_pgh_theo_so_ct(code: str, warehouse_id: Optional[int] = None, page_size: int = 50) -> Optional[dict]:
+    """Tìm PGH theo SỐ CHỨNG TỪ (vd 'PGH06022620F0ABB9') qua deliveryorders/get-list.
+
+    Dùng `searchContent` = số chứng từ + dải ngày rộng. LƯU Ý get-list nhận ngày ĐẢO NGƯỢC
+    (fromDate = mốc muộn, toDate = mốc sớm); để None hoặc thuận chiều sẽ trả rỗng. Trả item
+    khớp đúng `code` (có 'id' = GUID nội bộ, 'statusName', ...), hoặc None.
+    (get-Delivery-By-Code chỉ trả chuỗi mã cho autocomplete, không có id.)
+    """
+    wh = str(warehouse_id if warehouse_id is not None else (settings.DEFAULT_KHO_DEN_ID or 5))
+    body = {
+        "page": 1, "pageSize": page_size, "sortField": "", "sortOrder": "ASC",
+        "customerType": None, "customerCodeFilter": None, "statusId": None,
+        "searchContent": code, "creatorId": None, "warehouseId": wh,
+        "packageFFilter": None, "deliveryMethodId": None, "typeDate": 1,
+        "fromDate": "2100-01-01T00:00:00.000Z", "toDate": "2000-01-01T00:00:00.000Z",
+    }
+    data = _post(settings.KK_BASE_KHODEN, "/warehouseexport/api/deliveryorders/get-list", body)
+    items = data.get("data") or []
+    for it in items:
+        if (it.get("code") or "") == code:
+            return it
+    return None
+
+
+def xoa_pgh(delivery_order_id: str) -> dict:
+    """Xóa PGH theo GUID nội bộ. POST deliveryorders/delete-delivery?Id=<GUID> (body rỗng).
+
+    Trả {responseStatus, responseMess, data}. Lưu ý: hệ kho đến TỪ CHỐI xóa nếu kiện F
+    của phiếu đã xuất kho ("Phiếu liên hàng này có kiện hàng đã được xuất kho!").
+    """
+    return _post(
+        settings.KK_BASE_KHODEN,
+        f"/warehouseexport/api/deliveryorders/delete-delivery?Id={delivery_order_id}",
+        {},
+    )
+
+
+def xoa_pgh_theo_so_ct(code: str) -> dict:
+    """Tiện ích: resolve số chứng từ -> GUID rồi xóa. Raise KhodenError nếu không tìm thấy.
+
+    Trả {code, id, status, resp} với resp là response của delete-delivery.
+    """
+    it = tim_pgh_theo_so_ct(code)
+    if not it:
+        raise KhodenError(f"Không tìm thấy PGH số chứng từ {code!r} trên hệ kho đến.")
+    return {
+        "code": code,
+        "id": it["id"],
+        "status": it.get("statusName"),
+        "resp": xoa_pgh(it["id"]),
+    }
+
+
+# ===== Kho đến: đối tác VTP + tra cứu màn hình tạo PGH =====
+# (Bóc từ hệ thật quanly.vanchuyenkinkin.com — xem docs/quanly-pgh-api.md.
+#  Trên backend trực tiếp, các path này nằm dưới /warehouseexport/api/deliveryorders/...)
+
+def ds_doi_tac_vc() -> list[dict]:
+    """GET deliveryorders/get-list-delivery-partner → [{id, name}] (Viettel Post id = 1002)."""
+    data = _get(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/deliveryorders/get-list-delivery-partner",
+        {},
+    )
+    return data.get("data") if isinstance(data, dict) else (data or [])
+
+
+def bao_gia_vtp(body: dict) -> list[dict]:
+    """POST deliveryorders/get-list-service → danh sách dịch vụ VTP + giá cước.
+
+    body (field kiểu VTP UPPERCASE): PRODUCT_WEIGHT, PRODUCT_PRICE, MONEY_COLLECTION,
+    PRODUCT_LENGTH/WIDTH/HEIGHT, KhoHangId, SENDER_PROVINCE/DISTRICT, RECEIVER_PROVINCE/DISTRICT.
+    Item trả về: {mA_DV_CHINH (mã DV), teN_DICHVU (tên), thoI_GIAN, giA_CUOC (giá cước)}.
+    """
+    data = _post(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/deliveryorders/get-list-service",
+        body,
+    )
+    return data.get("data") if isinstance(data, dict) else (data or [])
+
+
+def tach_dia_chi(text: str) -> dict:
+    """GET deliveryorders/formatAddress?input= → parse địa chỉ tự do → tỉnh/huyện/xã (best-effort)."""
+    return _get(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/deliveryorders/formatAddress",
+        {"input": text},
+    )
+
+
+def tim_ma_khach(term: str, is_parent: Optional[bool] = None) -> list[dict]:
+    """POST deliveryorders/get-customer-code → tra khách theo từ khoá (mã/sđt).
+
+    Item: {code, phone, displayName, paymentType, id (GUID), isFromVN2QT, ...}.
+    """
+    body = {"customerCode": term, "isParent": is_parent}
+    data = _post(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/deliveryorders/get-customer-code",
+        body,
+    )
+    return data.get("data") if isinstance(data, dict) else (data or [])
+
+
+def tim_f_theo_thong_tin(body: dict) -> list[dict]:
+    """POST deliveryorders/get-packageF-by-information → tìm kiện F theo customerCode/F/K/tracking/MAWB."""
+    data = _post(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/deliveryorders/get-packageF-by-information",
+        body,
+    )
+    payload = data.get("data") if isinstance(data, dict) else data
+    if isinstance(payload, dict):
+        return payload.get("items") or payload.get("data") or []
+    return payload or []
+
+
+def tim_k_theo_thong_tin(body: dict) -> list[dict]:
+    """POST deliveryorders/get-packageK-by-information → tìm kiện K theo thông tin."""
+    data = _post(
+        settings.KK_BASE_KHODEN,
+        "/warehouseexport/api/deliveryorders/get-packageK-by-information",
+        body,
+    )
+    payload = data.get("data") if isinstance(data, dict) else data
+    if isinstance(payload, dict):
+        return payload.get("items") or payload.get("data") or []
+    return payload or []
 
 
 # ===== Tiện ích so khớp tên địa danh (cho luồng địa chỉ mới) =====

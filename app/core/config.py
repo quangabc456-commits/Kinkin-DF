@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     VTP_BASE_URL: str = "https://partnerdev.viettelpost.vn"
     VTP_PRINT_BASE_URL: str = "https://dev-print.viettelpost.vn"
+    VTP_SECRET_TOKEN: str = ""  # token LoginVTP (secret) — set trong .env, KHÔNG commit
 
     FERNET_KEY: str = ""
 
@@ -30,11 +31,15 @@ class Settings(BaseSettings):
     KK_BASE_IDENTITY: str = "https://identityapi.vanchuyenkinkin.com"
     KK_BASE_WAREHOUSE: str = "https://warehouseexportapi.vanchuyenkinkin.com"
     KK_BASE_DEPARTURE: str = "https://warehousedepartureapi.vanchuyenkinkin.com"
-    # API kho đến — hệ *.dion.vn (RIÊNG, khác hệ vanchuyenkinkin.com ở trên)
-    KK_BASE_KHODEN: str = "https://apikhoden-kinkin.dion.vn"      # PGH + địa chỉ
-    KK_BASE_KHODEN_IDENTITY: str = "https://identity-kinkin.dion.vn"  # /connect/token
-    KK_BASE_KHODEN_CORE: str = "https://apicore-kinkin.dion.vn"   # khách + địa danh
-    # Tài khoản hệ dion.vn (KHÁC KK_USERNAME/KK_PASSWORD ở trên — aitool01 không dùng được)
+    # API kho đến — hệ THẬT *.vanchuyenkinkin.com (đã chuyển từ TEST *.dion.vn).
+    # Path endpoint GIỐNG HỆT giữa 2 hệ → chỉ đổi host. (Test cũ: apikhoden/identity/apicore-kinkin.dion.vn.)
+    KK_BASE_KHODEN: str = "https://warehouseexportapi.vanchuyenkinkin.com"   # PGH + địa chỉ + kiện F
+    KK_BASE_KHODEN_IDENTITY: str = "https://identityapi.vanchuyenkinkin.com"  # /connect/token
+    KK_BASE_KHODEN_CORE: str = "https://kinkincoreapi.vanchuyenkinkin.com"   # khách + địa danh
+    # ID đối tác vận chuyển Viettel Post trên hệ kho đến (tạo PGH kho đến + VTP trong 1 call)
+    VIETTELPOST_PARTNER_ID: int = 1002
+    # Tài khoản kho đến hệ THẬT (CẦN cấp tài khoản vanchuyenkinkin.com có quyền WarehouseExport;
+    # tài khoản nvadmin của dion.vn KHÔNG dùng được trên hệ thật)
     KK_KHODEN_USERNAME: str = ""
     KK_KHODEN_PASSWORD: str = ""
     KK_USERNAME: str = ""

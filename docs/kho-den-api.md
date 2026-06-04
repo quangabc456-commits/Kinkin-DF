@@ -98,6 +98,33 @@ packageDeliveryDtos:[{ codeTracking:<packageFCode GKA…>, orderDetailId:null, p
 - `customerId` ← (1); `addressId` ← (2) hoặc id trả từ (4); `packageFId`/`packageFCode` ← cache F.
 - `deliveryMethodId`: 2 = Giao hàng trực tiếp (UI có: Luân chuyển / Giao trực tiếp / Qua đối tác / Tại kho).
 
+## 6. Xóa PGH — ĐÃ XÁC MINH (từ bundle JS trang thật)
+
+`POST apikhoden-kinkin.dion.vn/warehouseexport/api/deliveryorders/delete-delivery?Id=<deliveryOrderId>`
+Body rỗng `{}`. Header `Authorization: Bearer <token>`.
+
+Bóc từ `main.*.js`:
+```js
+deleteDeliveryNote(t){ return this.http.post(this.wareHouseApiEndpoint+`/deliveryorders/delete-delivery?Id=${t}`,{}) }
+```
+- `Id` = **GUID nội bộ của PGH** (KHÔNG phải số chứng từ `PGH06022620F0ABB9`).
+- vd PGH06022620F0ABB9 (bản nháp test) → Id = `548dfc4b-57c2-42dd-b08b-db3eba0fa1cc`.
+- **Quy tắc nghiệp vụ:** API từ chối nếu kiện F của phiếu đã xuất kho →
+  `{responseStatus:false, responseMess:"Phiếu liên hàng này có kiện hàng đã được xuất kho!"}`.
+  Chỉ xóa được phiếu mà F còn tồn (vd bản nháp chưa xuất).
+
+### Resolve số chứng từ → GUID
+- `GET deliveryorders/get-Delivery-By-Code?code=<code>` chỉ trả **mảng chuỗi mã** (autocomplete),
+  KHÔNG có id → không dùng để lấy GUID.
+- Dùng `POST deliveryorders/get-list` với `searchContent=<số chứng từ>` (field `id` mỗi item = GUID).
+  ⚠️ get-list nhận ngày **ĐẢO NGƯỢC**: `fromDate` = mốc muộn, `toDate` = mốc sớm (thuận chiều/None → rỗng).
+  Hoặc trang chi tiết có call `auditlog/get-audit-log?resourceId=<GUID>`.
+
+### Hàm dùng lại (`app/integrations/khoden_client.py`)
+`tim_pgh_theo_so_ct(code)` → item (có `id`); `xoa_pgh(id)` → delete-delivery; `xoa_pgh_theo_so_ct(code)` → resolve+xóa.
+
 ## Phân loại UI (tham khảo từ trang thật)
 Trạng thái F: Chờ nhập / Nhập kho / Chia hàng / Lưu kho / Đã xuất…
 HT giao hàng: **Luân Chuyển / Giao hàng trực tiếp / Giao hàng qua đối tác / Giao hàng tại kho**.
+
+> Token VTP đã chuyển vào `.env` (`VTP_SECRET_TOKEN`) — KHÔNG để trong file tài liệu (tránh lộ khi commit).

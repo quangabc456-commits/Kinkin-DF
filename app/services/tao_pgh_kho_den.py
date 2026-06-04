@@ -1,4 +1,4 @@
-"""Tạo PGH trên hệ KHO ĐẾN (*.dion.vn).
+"""Tạo PGH trên hệ KHO ĐẾN (*.vanchuyenkinkin.com — hệ THẬT; trước đây TEST *.dion.vn).
 
 2 luồng địa chỉ người nhận:
   - "địa chỉ cũ": đã có addressId (từ deliveryAddress của khách) → dùng luôn.
@@ -129,47 +129,58 @@ def build_body_pgh(
     total_weight: float = 0,
     warehouse_id: Optional[int] = None,
     is_draft: bool = True,
+    vtp: Optional[dict] = None,
 ) -> dict[str, Any]:
     """Build body cho deliveryorders/add-update-delivery.
 
     packages: list các dict {"packageFId": <GUID>, "codeTracking": <packageFCode GKA…>}.
+    vtp: nếu có → tạo đồng thời đơn Viettel Post (1-call) bằng cách nhồi cụm `partner*`
+         vào orderInformation. Các key dùng: service, payment, cod, price, product_name,
+         length, width, height, warehouse_phone, warehouse_address, warehouse_name,
+         partner_id (mặc định settings.VIETTELPOST_PARTNER_ID). Xem docs/quanly-pgh-api.md.
     """
     if not packages:
         raise KhoDenServiceError("packages rỗng — cần ít nhất 1 kiện F.")
     wh = warehouse_id if warehouse_id is not None else int(settings.DEFAULT_KHO_DEN_ID or 5)
     pay = payment_method_id if payment_method_id is not None else (khach.get("paymentType") or 2)
 
+    order_info: dict[str, Any] = {
+        "id": None,
+        "deliveryMethod": None,
+        "deliveryMethodId": delivery_method_id,
+        "customerType": customer_type,
+        "customerTypeName": None,
+        "customerCode": khach.get("code"),
+        "customerName": khach.get("name"),
+        "customerPhone": khach.get("phone"),
+        "customerId": khach.get("id"),
+        "addressId": address_id,
+        "addressDetail": None,
+        "paymentMethod": None,
+        "paymentMethodId": pay,
+        "note": note,
+        "receivedDateTime": received_date,
+        "receivedDateTimeDetail": "",
+        "warehousRearrives": None,
+        "warehousRearrivesId": None,
+        "createDate": None,
+        "creator": None,
+        "totalWeight": total_weight,
+        "total": len(packages),
+        "BillCloseDate": None,
+        "MawId": None,
+    }
+
+    if vtp:
+        # Đồng thời tạo đơn Viettel Post — backend kho đến nhận cụm partner* (xem hệ thật quanly).
+        order_info.update(_vtp_partner_fields(vtp))
+
     return {
         "isDraft": is_draft,
         "isCreate": True,
         "isRotation": False,
         "warehouseId": wh,
-        "orderInformation": {
-            "id": None,
-            "deliveryMethod": None,
-            "deliveryMethodId": delivery_method_id,
-            "customerType": customer_type,
-            "customerTypeName": None,
-            "customerCode": khach.get("code"),
-            "customerName": khach.get("name"),
-            "customerPhone": khach.get("phone"),
-            "customerId": khach.get("id"),
-            "addressId": address_id,
-            "addressDetail": None,
-            "paymentMethod": None,
-            "paymentMethodId": pay,
-            "note": note,
-            "receivedDateTime": received_date,
-            "receivedDateTimeDetail": "",
-            "warehousRearrives": None,
-            "warehousRearrivesId": None,
-            "createDate": None,
-            "creator": None,
-            "totalWeight": total_weight,
-            "total": len(packages),
-            "BillCloseDate": None,
-            "MawId": None,
-        },
+        "orderInformation": order_info,
         "packageDeliveryDtos": [
             {
                 "codeTracking": p.get("codeTracking"),
@@ -178,6 +189,31 @@ def build_body_pgh(
             }
             for p in packages
         ],
+    }
+
+
+def _to_int(v: Any, default: int = 0) -> int:
+    try:
+        return int(str(v).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _vtp_partner_fields(vtp: dict) -> dict[str, Any]:
+    """Map dict vtp (từ form) → các field partner* của orderInformation."""
+    return {
+        "deliveryPartnerId": vtp.get("partner_id") or settings.VIETTELPOST_PARTNER_ID,
+        "partnerOrderService": vtp.get("service"),
+        "partnerOrderPayment": _to_int(vtp.get("payment"), 0),
+        "partnerMoneyCollection": _to_int(vtp.get("cod"), 0),
+        "partnerProductPrice": _to_int(vtp.get("price"), 0),
+        "partnerProductName": (vtp.get("product_name") or "").strip() or None,
+        "partnerProductLength": _to_int(vtp.get("length"), 0),
+        "partnerProductWidth": _to_int(vtp.get("width"), 0),
+        "partnerProductHeight": _to_int(vtp.get("height"), 0),
+        "incomeWarehousePhone": vtp.get("warehouse_phone"),
+        "incomeWarehouseAddress": vtp.get("warehouse_address"),
+        "incomeWarehouseName": vtp.get("warehouse_name"),
     }
 
 
