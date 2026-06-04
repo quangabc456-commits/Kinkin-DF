@@ -66,6 +66,13 @@
 ## Khách hàng
 - `KhoDen/DeliveryOrders/api/get-customer-code` (POST, body `{customerCode:<term>, isParent}`)
   → `[{code, phone, displayName, paymentType, id(GUID), isFromVN2QT, isHaveWarehouseNotSameCountry, ...}]`.
+- **`customer/api/list-server-side-parent`** (POST) — DataTables trang **Danh sách khách hàng**.
+  Lọc bằng **`searchAll`** (KHÔNG phải `search.value`): khớp **mã + TÊN THẬT** (không khớp sđt),
+  không có → `recordsFiltered:0` (⇒ "chưa có khách → tạo tài khoản"). Item: `{id(INT kinkinId, KHÔNG
+  phải GUID), code, name(=TÊN THẬT), displayName(=mã), phone, paymentType, groupName, address, ...}`.
+  Body tối thiểu: `{draw,columns:[…],start,length,search:{value:"",regex:false},searchAll:<term>,
+  nguoiQuanLy:null,trangThaiHoatDong:"",bangGiaSanId:0}`. ⇒ tìm khách theo TÊN (get-customer-code &
+  core get-list-customer-by-search chủ yếu theo mã); `id` INT nên cần resolve code→GUID qua core khi tạo PGH.
 
 ## Kiện F / K
 - `KhoDen/DeliveryOrders/api/get-packageF-by-information` (POST) — tìm kiện F theo customerCode/F/K/tracking/MAWB.
