@@ -43,14 +43,39 @@ def _can_nang_float(ds: DuLieuSheet) -> float:
         return 0.0
 
 
+def _tim_khach(session: Session, term: str) -> list[dict]:
+    """Tra khách GIỐNG trang quản lý: LIVE core `get-list-customer-by-search` trước
+    (đầy đủ, cùng endpoint lúc tạo PGH), fallback cache kd_khach_hang khi:
+      - thiếu token / lỗi mạng, HOẶC
+      - live trả rỗng (vd gõ theo TÊN: live tìm theo mã → cache ILIKE tên mới khớp).
+    """
+    term = (term or "").strip()
+    if not term:
+        return []
+    try:
+        live = kc.tim_khach(term)
+    except KhodenError:
+        live = []
+    if live:
+        return live
+    return doc.tim_khach(session, term, limit=25)
+
+
 @router.get("/api/khach", response_class=JSONResponse)
 def api_tim_khach(q: str = "", session: Session = Depends(get_db)):
-    """Typeahead tra khách từ DB cache (kd_khach_hang) — nhanh, không cần token.
+    """Typeahead tra khách (live core → fallback cache). Trả [{code, name, phone}].
 
-    Trả [{code, name, phone}] để datalist gợi ý. value = code (submit lại resolve chính xác).
+    value = code → submit lại resolve chính xác. Tên hiển thị ưu tiên displayName/name.
     """
-    rows = doc.tim_khach(session, q, limit=25)
-    return [{"code": r["code"], "name": r["name"], "phone": r["phone"]} for r in rows]
+    rows = _tim_khach(session, q)
+    return [
+        {
+            "code": r.get("code"),
+            "name": r.get("displayName") or r.get("name"),
+            "phone": r.get("phone"),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/{ds_id}", response_class=HTMLResponse)
@@ -83,21 +108,26 @@ def form_tao_pgh(
         "loi_kien": None,
     }
 
-    # ===== Tra khách từ DB cache (kd_khach_hang) — KHÔNG cần token, nhanh =====
+    # ===== Tra khách: LIVE như trang quản lý (đầy đủ) → fallback cache =====
     khach = None
     if code:
-        khach = doc.lay_khach_theo_code(session, code)  # khớp mã chính xác
-        if khach is None:
-            matches = doc.tim_khach(session, code, limit=25)  # tìm theo tên/mã/sđt
-            if len(matches) == 1:
-                khach = matches[0]
-            elif len(matches) > 1:
-                ctx["candidates"] = matches  # nhiều khớp → cho user chọn
-            else:
-                ctx["loi_khach"] = (
-                    f"Không tìm thấy khách khớp {code!r} trong cache. "
-                    "Gõ tên/mã khác, hoặc chạy đồng bộ khách (sync kho đến)."
-                )
+        matches = _tim_khach(session, code)
+        # ưu tiên khớp MÃ chính xác (vd 093HN-VAT) khi có nhiều kết quả
+        exact = next(
+            (m for m in matches if (m.get("code") or "").strip().upper() == code.upper()),
+            None,
+        )
+        if exact is not None:
+            khach = exact
+        elif len(matches) == 1:
+            khach = matches[0]
+        elif len(matches) > 1:
+            ctx["candidates"] = matches  # nhiều khớp → cho user chọn
+        else:
+            ctx["loi_khach"] = (
+                f"Không tìm thấy khách khớp {code!r}. Gõ MÃ khách (vd 093HN-VAT) "
+                "hoặc tên; gợi ý hiện khi gõ ≥ 2 ký tự."
+            )
 
     if khach is not None:
         ctx["khach"] = khach

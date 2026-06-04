@@ -55,6 +55,33 @@ def _as_list(d: Any) -> list[dict]:
     return []
 
 
+# ===== Tra khách (GIỐNG trang quản lý: gateway get-customer-code) =====
+
+def tim_khach(term: str, is_parent: Optional[bool] = None) -> list[dict]:
+    """POST KhoDen/DeliveryOrders/api/get-customer-code — typeahead khách GIỐNG trang quản lý.
+
+    Trả list chuẩn hoá {id(GUID), code, name, phone, paymentType, isParent} để dùng chung
+    với cache (kho_den_ref_doc). displayName của gateway → map sang name.
+    """
+    data = _post(
+        "/KhoDen/DeliveryOrders/api/get-customer-code",
+        {"customerCode": (term or "").strip(), "isParent": is_parent},
+    )
+    out: list[dict] = []
+    for r in _as_list(data):
+        out.append(
+            {
+                "id": r.get("id"),
+                "code": r.get("code"),
+                "name": r.get("displayName") or r.get("name"),
+                "phone": r.get("phone"),
+                "paymentType": r.get("paymentType"),
+                "isParent": r.get("isParent"),
+            }
+        )
+    return out
+
+
 # ===== Đối tác VC + báo giá VTP =====
 
 def ds_doi_tac() -> list[dict]:
