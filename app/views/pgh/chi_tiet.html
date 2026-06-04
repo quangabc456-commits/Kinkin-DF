@@ -10,7 +10,7 @@
     </div>
     <div>
       {% if pgh.trang_thai_pgh == 'da_chot' %}<span class="badge ok dot">Đã chốt</span>
-      {% elif pgh.trang_thai_pgh == 'loi_api' %}<span class="badge err dot">Lỗi API</span>
+      {% elif pgh.trang_thai_pgh == 'loi_api' %}<span class="badge err dot">Gửi chưa thành công</span>
       {% elif pgh.trang_thai_pgh == 'hoan_thanh' %}<span class="badge ok dot">Hoàn thành</span>
       {% elif pgh.trang_thai_pgh == 'da_huy' %}<span class="badge warn dot">Đã huỷ</span>
       {% elif pgh.trang_thai_pgh == 'hoan_hang' %}<span class="badge warn dot">Hoàn hàng</span>
@@ -46,7 +46,7 @@
     <div class="muted">Địa chỉ</div>
     <div>{{ pgh.nguoi_nhan_dia_chi }}</div>
     <div class="muted" style="margin-top:.25rem; font-size: 11.5px;">
-      Tỉnh ID: {{ pgh.nguoi_nhan_tinh_id or '—' }} · Huyện ID: {{ pgh.nguoi_nhan_huyen_id or '—' }} · Xã ID: {{ pgh.nguoi_nhan_xa_id or '—' }}
+      Mã tỉnh: {{ pgh.nguoi_nhan_tinh_id or '—' }} · Mã huyện: {{ pgh.nguoi_nhan_huyen_id or '—' }} · Mã xã: {{ pgh.nguoi_nhan_xa_id or '—' }}
     </div>
   </div>
 </div>
@@ -79,9 +79,9 @@
 
 {% if dong %}
 <div class="card">
-  <div class="card-title">Dòng sheet nguồn</div>
+  <div class="card-title">Dòng dữ liệu gốc</div>
   <div class="row" style="gap: 2rem;">
-    <div><div class="muted">Sheet</div><div><code>{{ dong.ten_sheet }}</code> · dòng {{ dong.sheet_row_index }}</div></div>
+    <div><div class="muted">Bảng nguồn</div><div><code>{{ dong.ten_sheet }}</code> · dòng {{ dong.sheet_row_index }}</div></div>
     <div><div class="muted">Mã vận đơn</div><div><code>{{ dong.ma_van_don }}</code></div></div>
     <div><div class="muted">K</div><div>{{ dong.ma_kien_k or '—' }}</div></div>
     <div><div class="muted">F cha</div><div>{{ dong.ma_f_cha or '—' }}</div></div>
@@ -91,12 +91,12 @@
 {% endif %}
 
 <div class="card">
-  <div class="card-title">Request đã gửi VTP</div>
+  <div class="card-title">Thông tin đã gửi sang Viettel Post</div>
   <pre>{{ pgh.vtp_request_json | tojson(indent=2) }}</pre>
 </div>
 
 <div class="card">
-  <div class="card-title">Response từ VTP</div>
+  <div class="card-title">Kết quả nhận về từ Viettel Post</div>
   <pre>{{ pgh.vtp_response_json | tojson(indent=2) }}</pre>
 </div>
 

@@ -25,7 +25,7 @@
     <div class="sub">PGH gửi VTP thành công</div>
   </div>
   <div class="stat">
-    <div class="label">Lỗi API</div>
+    <div class="label">Đơn bị lỗi</div>
     <div class="value" style="color:var(--kk-error);">{{ so_loi }}</div>
     <div class="sub">cần xem lại</div>
   </div>
@@ -114,7 +114,7 @@
               <span class="badge warn dot" title="Thiếu: {{ p.thieu_truong_json|join(', ') if p.thieu_truong_json else '' }}">Thiếu thông tin</span>
               <div style="margin-top:.25rem;"><a href="/pgh/cho-dien-thong-tin/#row-{{ p.id }}">Điền ngay</a></div>
             {% elif p and p.trang_thai_pgh == 'loi_api' %}
-              <span class="badge err dot" title="{{ p.loi_message }}">Lỗi API</span>
+              <span class="badge err dot" title="{{ p.loi_message }}">Đơn bị lỗi</span>
               <div style="margin-top:.25rem;"><a href="/pgh/{{ p.id }}">Xem lỗi</a></div>
             {% else %}
               <span class="badge neutral dot">Chờ chốt</span>
@@ -145,8 +145,8 @@
         </tr>
       {% else %}
         <tr><td colspan="13" style="text-align:center; padding: 2.5rem 1rem;">
-          <div class="muted" style="font-size:14px;">Không có vận đơn nào khớp bộ lọc.</div>
-          <div class="muted" style="font-size:12.5px; margin-top:.3rem;">Thử bỏ lọc hoặc sync sheet mới bằng <code>python -m app.cli.sync --sheet &lt;dd-mm-yy&gt;</code>.</div>
+          <div class="muted" style="font-size:14px;">Không tìm thấy vận đơn nào phù hợp.</div>
+          <div class="muted" style="font-size:12.5px; margin-top:.3rem;">Thử bỏ bớt điều kiện lọc hoặc liên hệ kỹ thuật để cập nhật dữ liệu mới.</div>
         </td></tr>
       {% endfor %}
     </tbody>

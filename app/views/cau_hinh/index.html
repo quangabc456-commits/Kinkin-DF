@@ -4,8 +4,8 @@
 
 {% if request.query_params.get('sync') == 'queued' %}
   <div class="card" style="border-color: var(--kk-success); background: var(--kk-success-bg);">
-    <strong style="color: var(--kk-success);">✓ Đã kích hoạt sync toàn bộ</strong>
-    <span class="muted" style="margin-left:.5rem;">Quá trình chạy nền, refresh trang để xem log mới.</span>
+    <strong style="color: var(--kk-success);">✓ Đã bắt đầu lấy toàn bộ dữ liệu</strong>
+    <span class="muted" style="margin-left:.5rem;">Đang chạy ngầm, tải lại trang để xem kết quả mới.</span>
   </div>
 {% endif %}
 <h1 style="margin: 0 0 1rem; font-size: 22px; letter-spacing: -.02em;">Cài đặt</h1>
@@ -14,24 +14,24 @@
 <div class="card">
   <div class="card-title">🤖 Tài khoản Bot Google</div>
   <p class="muted" style="margin-top: 0;">
-    Đây là email service account của bot. <strong>Phải share quyền truy cập (Editor/Viewer) cho email này</strong> trên mỗi Google Sheet muốn import dữ liệu.
+    Đây là địa chỉ email của bot. <strong>Phải chia sẻ quyền truy cập (Chỉnh sửa/Xem) cho email này</strong> trên mỗi Google Sheet muốn lấy dữ liệu vào.
   </p>
   {% if bot.ok %}
     <div class="row" style="margin-top:.5rem;">
       <div style="flex: 1;">
-        <label>Email bot (copy & share)</label>
+        <label>Email bot (sao chép & chia sẻ)</label>
         <input id="bot-email" type="text" readonly value="{{ bot.email }}" style="width: 100%; font-family: ui-monospace, monospace; font-size: 13px;">
       </div>
       <div style="align-self: flex-end;">
-        <button class="btn" type="button" onclick="copyVal('bot-email', this)">Copy email</button>
+        <button class="btn" type="button" onclick="copyVal('bot-email', this)">Sao chép email</button>
       </div>
     </div>
     <div class="muted" style="margin-top:.5rem; font-size: 12px;">
-      Project: <code>{{ bot.project }}</code>
+      Dự án: <code>{{ bot.project }}</code>
     </div>
   {% else %}
     <div style="background: var(--kk-error-bg); color: var(--kk-error); padding:.5rem .75rem; border-radius: var(--kk-radius-sm);">
-      Không đọc được file credentials: {{ bot.loi }}
+      Không đọc được thông tin đăng nhập của bot: {{ bot.loi }}
     </div>
   {% endif %}
 </div>
@@ -41,20 +41,20 @@
   <div class="card-title">📑 Google Sheet nguồn</div>
   <form method="post" action="/cau-hinh/sheet">
     <div style="display: flex; flex-direction: column; gap: .35rem; margin-bottom: .85rem;">
-      <label for="sheet_input">Link Google Sheet hoặc Spreadsheet ID</label>
+      <label for="sheet_input">Đường dẫn Google Sheet hoặc mã bảng tính</label>
       <input id="sheet_input" name="sheet_input" type="text"
-             placeholder="https://docs.google.com/spreadsheets/d/XXXX/edit hoặc dán trực tiếp ID"
+             placeholder="https://docs.google.com/spreadsheets/d/XXXX/edit hoặc dán trực tiếp mã"
              value="{{ sheet_id }}"
              style="width: 100%;">
       <span class="muted" style="font-size: 12px;">
-        Hệ thống tự tách ID từ URL. Sheet phải có các worksheet tên dạng <code>dd-mm-yy</code> (vd: <code>25-05-26</code>) đúng template chuẩn.
+        Hệ thống tự tách mã từ đường dẫn. Bảng tính phải có các trang tên dạng <code>dd-mm-yy</code> (vd: <code>25-05-26</code>) đúng mẫu chuẩn.
       </span>
     </div>
 
     <div class="row">
       <button class="btn" type="submit">Lưu cấu hình</button>
       {% if sheet_url_hien_tai %}
-        <a class="btn ghost sm" href="{{ sheet_url_hien_tai }}" target="_blank" rel="noopener">Mở sheet hiện tại ↗</a>
+        <a class="btn ghost sm" href="{{ sheet_url_hien_tai }}" target="_blank" rel="noopener">Mở bảng tính hiện tại ↗</a>
       {% endif %}
     </div>
   </form>
@@ -62,19 +62,19 @@
 
 <!-- APPS SCRIPT -->
 <div class="card">
-  <div class="card-title">⚡ Apps Script (dán vào Sheet để bật webhook tự động)</div>
+  <div class="card-title">⚡ Apps Script (dán vào bảng tính để tự động cập nhật)</div>
   <p class="muted" style="margin-top: 0;">
     Webhook URL: <code>{{ webhook_url }}</code><br>
     Secret: <code style="font-size: 11px;">{{ webhook_secret }}</code>
     <form method="post" action="/cau-hinh/rotate-secret" style="display: inline-block; margin-left: .5rem;">
-      <button class="btn ghost sm" type="submit" onclick="return confirm('Tạo secret mới? Sau đó phải dán lại Apps Script vào sheet.')">↻ Đổi secret</button>
+      <button class="btn ghost sm" type="submit" onclick="return confirm('Tạo mã bảo mật mới? Sau đó phải dán lại Apps Script vào bảng tính.')">↻ Đổi mã bảo mật</button>
     </form>
   </p>
 
   <div class="row" style="margin-bottom: .5rem;">
-    <button class="btn" type="button" onclick="copyTextarea('apps-script', this)">Copy toàn bộ Apps Script</button>
+    <button class="btn" type="button" onclick="copyTextarea('apps-script', this)">Sao chép toàn bộ Apps Script</button>
     <span class="muted" style="font-size: 12px;">
-      Cách dùng: Mở sheet → menu <strong>Extensions</strong> → <strong>Apps Script</strong> → Paste → Save → Run <code>setupTrigger</code> (cấp quyền).
+      Cách dùng: Mở bảng tính → menu <strong>Extensions</strong> → <strong>Apps Script</strong> → Dán → Lưu → Chạy <code>setupTrigger</code> (cấp quyền).
     </span>
   </div>
 
@@ -84,19 +84,19 @@
 {% if enable_sync_ui %}
 <!-- SYNC ACTION -->
 <div class="card">
-  <div class="card-title">🔄 Kéo toàn bộ dữ liệu</div>
+  <div class="card-title">🔄 Lấy toàn bộ dữ liệu</div>
   <p class="muted" style="margin-top: 0;">
-    Bấm nút này khi đổi sheet nguồn hoặc muốn refresh hết. Hệ thống quét mọi worksheet dạng <code>dd-mm-yy</code> và upsert vào DB. Chạy nền, có thể mất 3-10 phút tuỳ số sheet.
+    Bấm nút này khi đổi bảng tính nguồn hoặc muốn cập nhật lại tất cả. Hệ thống quét mọi trang dạng <code>dd-mm-yy</code> và lưu dữ liệu. Chạy ngầm, có thể mất 3-10 phút tuỳ số trang.
   </p>
   <form method="post" action="/cau-hinh/sync">
-    <button class="btn" type="submit" onclick="return confirm('Kéo toàn bộ data từ Google Sheet về DB? Có thể mất vài phút.')">Sync toàn bộ ngay</button>
+    <button class="btn" type="submit" onclick="return confirm('Lấy toàn bộ dữ liệu từ Google Sheet về? Có thể mất vài phút.')">Lấy toàn bộ ngay</button>
   </form>
 </div>
 {% else %}
 <div class="card" style="border-color: var(--kk-warn); background: var(--kk-warn-bg);">
-  <div class="card-title" style="color: var(--kk-warn);">⏸ Sync API tạm dừng</div>
+  <div class="card-title" style="color: var(--kk-warn);">⏸ Lấy dữ liệu đang tạm dừng</div>
   <p class="muted" style="margin-top: 0;">
-    Sync sheet đang tắt trên môi trường này (<code>ENABLE_SYNC_UI=false</code>). Nếu cần backfill data, chạy từ máy local: <code>python -m app.cli.sync --all</code> với <code>DATABASE_URL</code> trỏ vào DB sản xuất.
+    Tính năng lấy dữ liệu từ bảng tính đang tắt trên môi trường này (<code>ENABLE_SYNC_UI=false</code>). Nếu cần bổ sung dữ liệu, vui lòng liên hệ kỹ thuật để chạy thủ công: <code>python -m app.cli.sync --all</code>.
   </p>
 </div>
 {% endif %}
@@ -105,12 +105,12 @@
 <div class="card" id="vtp-accounts">
   <div class="card-title">📦 Tài khoản ViettelPost</div>
   <p class="muted" style="margin-top: 0;">
-    Worker chốt PGH lấy tài khoản <strong>mặc định</strong> đang <strong>kích hoạt</strong>. Password được mã hoá Fernet trước khi lưu, không hiển thị lại được. Sender info (tên, SĐT, địa chỉ kho gửi) lấy từ chính tài khoản VTP — không cần khai báo ở đây.
+    Khi chốt PGH, hệ thống dùng tài khoản <strong>mặc định</strong> đang <strong>bật</strong>. Mật khẩu được mã hoá trước khi lưu, không xem lại được. Thông tin người gửi (tên, SĐT, địa chỉ kho gửi) lấy từ chính tài khoản ViettelPost — không cần khai báo ở đây.
   </p>
 
   {% if not co_fernet %}
     <div style="background: var(--kk-warn-bg); color: var(--kk-warn); padding:.65rem .85rem; border-radius: var(--kk-radius-sm); margin-bottom:.75rem;">
-      ⚠️ Thiếu <code>FERNET_KEY</code> trong <code>.env</code> — không thêm được tài khoản dùng password. Tạo key bằng:<br>
+      ⚠️ Thiếu <code>FERNET_KEY</code> trong <code>.env</code> — không thêm được tài khoản dùng mật khẩu. Vui lòng liên hệ kỹ thuật để tạo khoá bằng:<br>
       <code>python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</code>
     </div>
   {% endif %}
@@ -120,15 +120,15 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
+            <th>Mã</th>
             <th>Tên hiển thị</th>
-            <th>Username</th>
+            <th>Tên đăng nhập</th>
             <th>Môi trường</th>
-            <th>Có password</th>
-            <th>Có secret_token</th>
-            <th>Token cache</th>
+            <th>Có mật khẩu</th>
+            <th>Có mã bảo mật</th>
+            <th>Phiên đăng nhập</th>
             <th>Trạng thái</th>
-            <th>Hành động</th>
+            <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -141,13 +141,13 @@
               </td>
               <td><code>{{ tk.username }}</code></td>
               <td>
-                {% if tk.moi_truong == 'production' %}<span class="badge ok">production</span>
-                {% else %}<span class="badge warn">development</span>{% endif %}
+                {% if tk.moi_truong == 'production' %}<span class="badge ok">Chính thức</span>
+                {% else %}<span class="badge warn">Thử nghiệm</span>{% endif %}
               </td>
               <td>{% if tk.co_password %}<span class="badge ok dot">Có</span>{% else %}—{% endif %}</td>
               <td>{% if tk.co_secret_token %}<span class="badge ok dot">Có</span>{% else %}—{% endif %}</td>
               <td>
-                {% if tk.co_token %}<span class="badge ok dot">cache</span><br><span class="muted" style="font-size:11px;">{{ tk.token_het_han_luc[:19] if tk.token_het_han_luc else '' }}</span>
+                {% if tk.co_token %}<span class="badge ok dot">Còn hiệu lực</span><br><span class="muted" style="font-size:11px;">{{ tk.token_het_han_luc[:19] if tk.token_het_han_luc else '' }}</span>
                 {% else %}<span class="muted">chưa có</span>{% endif %}
               </td>
               <td>
@@ -174,22 +174,22 @@
                       <input name="ten_hien_thi" type="text" value="{{ tk.ten_hien_thi }}" required>
                     </div>
                     <div style="flex:1; min-width:180px;">
-                      <label>Password mới (để trống = giữ nguyên)</label>
+                      <label>Mật khẩu mới (để trống = giữ nguyên)</label>
                       <input name="password" type="password" autocomplete="new-password" placeholder="••••••">
                     </div>
                     <div style="flex:1; min-width:180px;">
-                      <label>Secret token mới (để trống = giữ)</label>
+                      <label>Mã bảo mật mới (để trống = giữ nguyên)</label>
                       <input name="secret_token" type="password" autocomplete="new-password" placeholder="••••••">
                     </div>
                     <div style="flex:1; min-width:180px;">
-                      <label>Webhook secret (Authorization header)</label>
+                      <label>Mã bảo mật nhận thông báo tự động</label>
                       <input name="webhook_secret" type="text" placeholder="để trống = giữ nguyên">
                     </div>
                     <div style="flex:0 0 140px;">
                       <label>Môi trường</label>
                       <select name="moi_truong">
-                        <option value="production" {% if tk.moi_truong == 'production' %}selected{% endif %}>production</option>
-                        <option value="development" {% if tk.moi_truong == 'development' %}selected{% endif %}>development</option>
+                        <option value="production" {% if tk.moi_truong == 'production' %}selected{% endif %}>Chính thức</option>
+                        <option value="development" {% if tk.moi_truong == 'development' %}selected{% endif %}>Thử nghiệm</option>
                       </select>
                     </div>
                     <div style="flex:0 0 120px; align-self:flex-end;">
@@ -224,33 +224,33 @@
           <input name="ten_hien_thi" type="text" placeholder="vd: Kho Hà Nội" required>
         </div>
         <div style="flex:1; min-width:200px;">
-          <label>Username (SĐT đăng ký VTP) *</label>
+          <label>Tên đăng nhập (SĐT đăng ký ViettelPost) *</label>
           <input name="username" type="text" placeholder="0901234567" required>
         </div>
         <div style="flex:0 0 140px;">
           <label>Môi trường</label>
           <select name="moi_truong">
-            <option value="production">production</option>
-            <option value="development">development</option>
+            <option value="production">Chính thức</option>
+            <option value="development">Thử nghiệm</option>
           </select>
         </div>
       </div>
       <div class="row" style="gap:.75rem; flex-wrap: wrap; margin-top:.6rem;">
         <div style="flex:1; min-width:200px;">
-          <label>Password VTP</label>
-          <input name="password" type="password" autocomplete="new-password" placeholder="Nhập password (sẽ mã hoá)">
-          <span class="muted" style="font-size:11px;">Mã hoá Fernet trước khi lưu DB.</span>
+          <label>Mật khẩu ViettelPost</label>
+          <input name="password" type="password" autocomplete="new-password" placeholder="Nhập mật khẩu (sẽ được mã hoá)">
+          <span class="muted" style="font-size:11px;">Được mã hoá trước khi lưu.</span>
         </div>
         <div style="flex:1; min-width:200px;">
-          <label>Hoặc Secret token (mục 2.3 docs VTP)</label>
-          <input name="secret_token" type="password" autocomplete="new-password" placeholder="Token dài hạn từ trang VTP">
-          <span class="muted" style="font-size:11px;">Ưu tiên khi có cả 2; token bền 1-2 năm.</span>
+          <label>Hoặc mã bảo mật ViettelPost</label>
+          <input name="secret_token" type="password" autocomplete="new-password" placeholder="Mã bảo mật dài hạn từ trang ViettelPost">
+          <span class="muted" style="font-size:11px;">Ưu tiên dùng khi có cả hai; mã bền 1-2 năm.</span>
         </div>
       </div>
       <div class="row" style="gap:.75rem; flex-wrap: wrap; margin-top:.6rem;">
         <div style="flex:1; min-width:200px;">
-          <label>Webhook secret (VTP gửi qua header Authorization)</label>
-          <input name="webhook_secret" type="text" placeholder="để trống nếu chưa dùng webhook">
+          <label>Mã bảo mật nhận thông báo tự động từ ViettelPost</label>
+          <input name="webhook_secret" type="text" placeholder="để trống nếu chưa dùng">
         </div>
         <div style="flex:0 0 160px; align-self:flex-end;">
           <label style="display:flex; gap:.3rem; align-items:center;">
@@ -260,7 +260,7 @@
         </div>
       </div>
       <div style="margin-top:.85rem;">
-        <button class="btn" type="submit" {% if not co_fernet %}disabled title="Thiếu FERNET_KEY"{% endif %}>Thêm tài khoản</button>
+        <button class="btn" type="submit" {% if not co_fernet %}disabled title="Chưa cấu hình khoá mã hoá — liên hệ kỹ thuật"{% endif %}>Thêm tài khoản</button>
       </div>
     </form>
   </details>
@@ -268,56 +268,56 @@
 
 <!-- KINKIN STATUS (read-only, config hardcoded trong .env) -->
 <div class="card">
-  <div class="card-title">🔐 Kết nối API Kinkin <span class="badge {% if kinkin_status.co_creds %}ok{% else %}err{% endif %} dot" style="margin-left:.4rem;">{% if kinkin_status.co_creds %}Đã cấu hình{% else %}Chưa cấu hình{% endif %}</span></div>
+  <div class="card-title">🔐 Kết nối hệ thống Kinkin <span class="badge {% if kinkin_status.co_creds %}ok{% else %}err{% endif %} dot" style="margin-left:.4rem;">{% if kinkin_status.co_creds %}Đã cấu hình{% else %}Chưa cấu hình{% endif %}</span></div>
   <p class="muted" style="margin-top: 0;">
-    Credentials được nhúng cứng trong file <code>.env</code> (không hiển thị / không sửa được từ UI). Token JWT cache trong memory ~50 phút, tự refresh khi hết hạn.
+    Thông tin đăng nhập được cài đặt sẵn trong hệ thống (không hiển thị, không sửa được tại đây). Phiên đăng nhập tự động làm mới khoảng 50 phút một lần khi hết hạn.
   </p>
 
   {% if kinkin_status.co_creds %}
     <div style="display:grid; grid-template-columns: max-content 1fr; gap:.35rem .9rem; font-size: 13px; margin-top:.5rem;">
-      <div class="muted">Identity base</div>
+      <div class="muted">Địa chỉ máy chủ đăng nhập</div>
       <div><code>{{ kinkin_status.base_identity }}</code></div>
 
-      <div class="muted">Warehouse base</div>
+      <div class="muted">Địa chỉ máy chủ kho</div>
       <div><code>{{ kinkin_status.base_warehouse }}</code></div>
 
-      <div class="muted">Username</div>
+      <div class="muted">Tên đăng nhập</div>
       <div><code>{{ kinkin_status.username }}</code></div>
 
-      <div class="muted">Customer code</div>
+      <div class="muted">Mã khách hàng</div>
       <div><code>{{ kinkin_status.customer_code }}</code></div>
 
-      <div class="muted">Warehouse IDs ({{ kinkin_status.warehouse_ids|length }} kho)</div>
+      <div class="muted">Danh sách kho ({{ kinkin_status.warehouse_ids|length }} kho)</div>
       <div>
         {% for wh in kinkin_status.warehouse_ids %}<span class="badge neutral" style="margin-right:.2rem;">{{ wh }}</span>{% endfor %}
       </div>
 
-      <div class="muted">_apikey (packageK)</div>
+      <div class="muted">Khoá tra cứu lịch sử kiện K</div>
       <div>
-        {% if kinkin_status.co_apikey_k %}<span class="badge ok dot">Có</span>{% else %}<span class="badge warn dot">Chưa</span> — endpoint k_history sẽ skip{% endif %}
+        {% if kinkin_status.co_apikey_k %}<span class="badge ok dot">Có</span>{% else %}<span class="badge warn dot">Chưa</span> — sẽ bỏ qua phần lịch sử kiện K{% endif %}
       </div>
 
-      <div class="muted">Token JWT</div>
+      <div class="muted">Phiên đăng nhập</div>
       <div>
-        {% if kinkin_status.co_token %}<span class="badge ok dot">Đang cache</span> — hết hạn lúc {{ kinkin_status.het_han_luc[:19] }}{% else %}<span class="badge neutral dot">Chưa lấy</span> — sẽ lấy ở lookup đầu tiên{% endif %}
+        {% if kinkin_status.co_token %}<span class="badge ok dot">Đang hoạt động</span> — hết hạn lúc {{ kinkin_status.het_han_luc[:19] }}{% else %}<span class="badge neutral dot">Chưa đăng nhập</span> — sẽ tự đăng nhập ở lần tra cứu đầu tiên{% endif %}
       </div>
     </div>
   {% else %}
     <div style="background: var(--kk-error-bg); color: var(--kk-error); padding:.65rem .85rem; border-radius: var(--kk-radius-sm); margin-top:.5rem;">
-      Thiếu <code>KK_USERNAME</code> / <code>KK_PASSWORD</code> trong <code>.env</code>. Bổ sung rồi restart app.
+      Thiếu <code>KK_USERNAME</code> / <code>KK_PASSWORD</code> trong <code>.env</code>. Vui lòng liên hệ kỹ thuật bổ sung rồi khởi động lại ứng dụng.
     </div>
   {% endif %}
 </div>
 
 <!-- SYNC HISTORY -->
 <div class="card">
-  <div class="card-title">📜 Lịch sử đồng bộ (20 gần nhất)</div>
+  <div class="card-title">📜 Lịch sử cập nhật dữ liệu (20 gần nhất)</div>
   {% if logs %}
     <div class="table-wrap" style="margin-top: .5rem;">
       <table>
         <thead>
           <tr>
-            <th>Sheet</th>
+            <th>Bảng tính</th>
             <th class="nowrap">Bắt đầu</th>
             <th class="nowrap">Kết thúc</th>
             <th class="nowrap">Đọc</th>
@@ -348,7 +348,7 @@
       </table>
     </div>
   {% else %}
-    <p class="muted">Chưa có lịch sử sync. Bấm <strong>Sync toàn bộ</strong> hoặc dán Apps Script vào sheet để bắt đầu.</p>
+    <p class="muted">Chưa có lịch sử cập nhật. Bấm <strong>Lấy toàn bộ</strong> hoặc dán Apps Script vào bảng tính để bắt đầu.</p>
   {% endif %}
 </div>
 

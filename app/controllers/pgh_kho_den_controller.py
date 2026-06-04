@@ -283,7 +283,7 @@ def submit_tao_pgh(
     if not packages:
         return templates.TemplateResponse(
             "pgh/kho_den_ket_qua.html",
-            {**ctx_base, "ok": False, "loi": "Chưa chọn kiện F nào để lên PGH."},
+            {**ctx_base, "ok": False, "loi": "Bạn chưa chọn kiện F nào để lên phiếu."},
             status_code=400,
         )
 
@@ -389,7 +389,7 @@ def submit_tao_pgh(
     # CHỈ coi là OK khi responseStatus thật sự truthy (không default True) — khớp pattern an toàn
     # ở tao_dia_chi. Response 200 thiếu responseStatus → coi là lỗi/không rõ để tránh ghi 'da_tao' giả.
     ok = bool(isinstance(resp, dict) and resp.get("responseStatus"))
-    loi = None if ok else f"API trả về lỗi/không rõ trạng thái: {str(resp)[:400]}"
+    loi = None if ok else "Hệ thống chưa tạo được phiếu (phản hồi chưa rõ). Vui lòng thử lại, hoặc kiểm tra lại trên hệ kho đến."
 
     # API kho đến đã tạo PGH; nếu GHI DB lỗi → cảnh báo orphan thay vì 500
     try:
@@ -405,8 +405,8 @@ def submit_tao_pgh(
             "pgh/kho_den_ket_qua.html",
             {
                 **ctx_base, "ok": False,
-                "loi": f"PGH có thể đã tạo trên hệ kho đến NHƯNG ghi DB thất bại: {e}. "
-                       f"Kiểm tra/đối soát thủ công. Resp: {str(resp)[:300]}",
+                "loi": "Phiếu có thể đã được tạo trên hệ kho đến nhưng lưu lại chưa thành công. "
+                       "Vui lòng kiểm tra/đối soát thủ công trên hệ kho đến.",
                 "kq": kq, "resp": resp, "req_body": kq.get("request"),
                 "dia_chi": kq.get("dia_chi"), "co_vtp": co_vtp, "db_loi": True,
             },
@@ -417,8 +417,7 @@ def submit_tao_pgh(
     canh_bao = None
     if ok and not pgh.ma_pgh_kinkin:
         canh_bao = (
-            "Tạo thành công nhưng chưa lấy được Mã PGH từ response (shape add-update-delivery "
-            "chưa xác minh) — cần kiểm tra trên hệ kho đến."
+            "Đã tạo phiếu nhưng chưa lấy được Mã phiếu — vui lòng kiểm tra lại trên hệ kho đến."
         )
 
     return templates.TemplateResponse(

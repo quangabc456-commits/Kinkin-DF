@@ -29,17 +29,17 @@ def resolve_dia_danh(
     tinhs = kc.ds_tinh(naction_id)
     tinh = kc.tim_theo_ten(tinhs, ten_tinh)
     if not tinh:
-        raise KhoDenServiceError(f"Không khớp Tỉnh: {ten_tinh!r}")
+        raise KhoDenServiceError(f"Không tìm thấy Tỉnh/Thành phố khớp: {ten_tinh}")
 
     huyens = kc.ds_huyen(tinh["id"])
     huyen = kc.tim_theo_ten(huyens, ten_huyen)
     if not huyen:
-        raise KhoDenServiceError(f"Không khớp Quận/Huyện: {ten_huyen!r} (trong {tinh['name']})")
+        raise KhoDenServiceError(f"Không tìm thấy Quận/Huyện khớp: {ten_huyen} (thuộc {tinh['name']})")
 
     xas = kc.ds_xa(huyen["id"])
     xa = kc.tim_theo_ten(xas, ten_xa)
     if not xa:
-        raise KhoDenServiceError(f"Không khớp Phường/Xã: {ten_xa!r} (trong {huyen['name']})")
+        raise KhoDenServiceError(f"Không tìm thấy Phường/Xã khớp: {ten_xa} (thuộc {huyen['name']})")
 
     return {
         "nationId": naction_id,
@@ -107,13 +107,13 @@ def tao_dia_chi_moi(
     }
     resp = kc.tao_dia_chi(body)
     if not (isinstance(resp, dict) and resp.get("responseStatus")):
-        raise KhoDenServiceError(f"Tạo địa chỉ thất bại. Resp: {str(resp)[:300]}")
+        raise KhoDenServiceError("Lưu địa chỉ chưa thành công. Vui lòng kiểm tra lại thông tin địa chỉ rồi thử lại.")
 
     moi = _match_dia_chi(
         kc.lay_dia_chi_cua_khach(khach["id"]), receiver, receive_phone, address, geo
     )
     if not moi:
-        raise KhoDenServiceError("Đã tạo địa chỉ nhưng không tìm lại được để lấy addressId.")
+        raise KhoDenServiceError("Đã lưu địa chỉ nhưng chưa lấy lại được. Vui lòng thử lại.")
     return {"addressId": moi["id"], "geo": geo, "tao_moi": True, "raw": moi, "request": body}
 
 
@@ -141,7 +141,7 @@ def build_body_pgh(
          partner_id (mặc định settings.VIETTELPOST_PARTNER_ID). Xem docs/quanly-pgh-api.md.
     """
     if not packages:
-        raise KhoDenServiceError("packages rỗng — cần ít nhất 1 kiện F.")
+        raise KhoDenServiceError("Chưa có kiện F nào để lên phiếu (cần ít nhất 1 kiện).")
     wh = warehouse_id if warehouse_id is not None else int(settings.DEFAULT_KHO_DEN_ID or 5)
     pay = payment_method_id if payment_method_id is not None else (khach.get("paymentType") or 2)
 
@@ -228,7 +228,7 @@ def tao_pgh_dia_chi_cu(
     """Luồng địa chỉ cũ: đã có addressId."""
     khach = kc.lay_customer_id(customer_code)
     if not khach:
-        raise KhoDenServiceError(f"Không tìm thấy khách {customer_code!r}")
+        raise KhoDenServiceError(f"Không tìm thấy khách hàng {customer_code}")
     body = build_body_pgh(khach=khach, address_id=address_id, packages=packages, **kwargs)
     resp = qc.tao_pgh(body)  # tạo qua gateway quanly → kho đến + VTP (partner*) trong 1 call
     return {"resp": resp, "request": body, "khach": khach}
@@ -249,7 +249,7 @@ def tao_pgh_dia_chi_moi(
     """Luồng địa chỉ mới: tạo địa chỉ → lấy addressId → tạo PGH."""
     khach = kc.lay_customer_id(customer_code)
     if not khach:
-        raise KhoDenServiceError(f"Không tìm thấy khách {customer_code!r}")
+        raise KhoDenServiceError(f"Không tìm thấy khách hàng {customer_code}")
     dc = tao_dia_chi_moi(khach, receiver, receive_phone, ten_tinh, ten_huyen, ten_xa, address)
     body = build_body_pgh(khach=khach, address_id=dc["addressId"], packages=packages, **kwargs)
     resp = qc.tao_pgh(body)  # tạo qua gateway quanly → kho đến + VTP (partner*) trong 1 call

@@ -25,12 +25,12 @@
     </div>
     {% if pgh %}
       <div class="muted" style="margin-top:.5rem;">
-        Đã lưu DB (phieu_giao_hang #{{ pgh.id }}){% if pgh.ma_pgh_kinkin %} · Mã PGH kho đến <code>{{ pgh.ma_pgh_kinkin }}</code>{% endif %}{% if pgh.ma_pgh_vtp %} · Mã VTP <code>{{ pgh.ma_pgh_vtp }}</code>{% endif %}
+        Đã lưu dữ liệu (phiếu #{{ pgh.id }}){% if pgh.ma_pgh_kinkin %} · Mã PGH kho đến <code>{{ pgh.ma_pgh_kinkin }}</code>{% endif %}{% if pgh.ma_pgh_vtp %} · Mã VTP <code>{{ pgh.ma_pgh_vtp }}</code>{% endif %}
       </div>
     {% endif %}
     {% if dia_chi %}
       <div class="muted" style="margin-top:.35rem;">
-        Địa chỉ: {{ 'tạo mới' if dia_chi.tao_moi else 'dùng địa chỉ đã có' }} · addressId <code style="font-size:11px;">{{ dia_chi.addressId }}</code>
+        Địa chỉ: {{ 'tạo mới' if dia_chi.tao_moi else 'dùng địa chỉ đã có' }} · Mã địa chỉ <code style="font-size:11px;">{{ dia_chi.addressId }}</code>
       </div>
     {% endif %}
   </div>
@@ -46,21 +46,21 @@
   {% endif %}
 {% else %}
   <div class="card" style="border-color:var(--kk-error); background:var(--kk-error-bg);">
-    <div class="card-title" style="color:var(--kk-error);">{% if db_loi %}⚠ Tạo trên hệ kho đến OK — nhưng GHI DB thất bại{% else %}✗ Tạo PGH thất bại{% endif %}</div>
+    <div class="card-title" style="color:var(--kk-error);">{% if db_loi %}⚠ Đã tạo trên hệ kho đến — nhưng lưu dữ liệu chưa thành công{% else %}✗ Tạo PGH thất bại{% endif %}</div>
     <div style="font-size:13.5px; color:var(--kk-ink-soft); white-space:pre-wrap;">{{ loi }}</div>
   </div>
 {% endif %}
 
 {% if resp %}
 <div class="card">
-  <div class="card-title">Response từ API</div>
+  <div class="card-title">Thông tin hệ thống trả về</div>
   <pre style="max-height:320px;">{{ resp | tojson(indent=2) }}</pre>
 </div>
 {% endif %}
 
 {% if req_body %}
 <details class="card">
-  <summary style="cursor:pointer; font-weight:600;">Request body đã gửi (debug)</summary>
+  <summary style="cursor:pointer; font-weight:600;">Nội dung đã gửi đi (chi tiết kỹ thuật)</summary>
   <pre style="max-height:420px; margin-top:.7rem;">{{ req_body | tojson(indent=2) }}</pre>
 </details>
 {% endif %}

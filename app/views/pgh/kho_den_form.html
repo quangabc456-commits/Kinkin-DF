@@ -36,9 +36,9 @@
 
 {% if loi_cau_hinh %}
   <div class="card" style="border-color:var(--kk-error); background:var(--kk-error-bg);">
-    <div class="card-title" style="color:var(--kk-error);">⚠ Chưa cấu hình tài khoản hệ kho đến</div>
+    <div class="card-title" style="color:var(--kk-error);">⚠ Chưa cấu hình tài khoản kho đến</div>
     <div style="font-size:13.5px; color:var(--kk-ink-soft);">{{ loi_cau_hinh }}</div>
-    <div class="muted" style="margin-top:.5rem;">Bổ sung <code>KK_KHODEN_USERNAME</code> / <code>KK_KHODEN_PASSWORD</code> trên Vercel rồi redeploy.</div>
+    <div class="muted" style="margin-top:.5rem;">Vui lòng liên hệ bộ phận kỹ thuật để bổ sung tài khoản đăng nhập kho đến.</div>
   </div>
 {% endif %}
 
@@ -185,7 +185,7 @@
     </div>
 
     <div id="addr-moi" style="display:none;">
-      <div class="muted" style="margin-bottom:.6rem;">Nhập Tỉnh / Quận-Huyện / Phường-Xã đúng như hệ kho đến (tự khớp, không phân biệt dấu/hoa-thường).</div>
+      <div class="muted" style="margin-bottom:.6rem;">Nhập Tỉnh / Quận-Huyện / Phường-Xã đúng như ở kho đến (tự khớp, không phân biệt dấu/hoa-thường).</div>
       <div class="q-grid3">
         <div class="q-field"><label>Tên người nhận</label><input form="form-pgh" type="text" name="receiver" value="{{ ds.ten_kh or '' }}"></div>
         <div class="q-field"><label>SĐT người nhận</label><input form="form-pgh" type="text" name="receive_phone" value="{{ ds.sdt_nguoi_nhan or '' }}"></div>
@@ -252,7 +252,7 @@
         <option value="0">— Không dùng (chỉ tạo PGH kho đến) —</option>
         {% for d in doi_tac %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
       </select>
-      <span class="muted" style="font-size:11px;">Chọn <strong>Viettel Post</strong> để tạo đồng thời đơn VTP (1-call).</span>
+      <span class="muted" style="font-size:11px;">Chọn <strong>Viettel Post</strong> để tạo đồng thời đơn Viettel Post.</span>
     </div>
     <div id="vtp-fields" style="display:none;">
       <div class="q-grid3">

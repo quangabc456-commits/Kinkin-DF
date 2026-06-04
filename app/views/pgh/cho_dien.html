@@ -5,15 +5,15 @@
 
 <h1 style="margin: 0 0 .25rem; font-size: 22px; letter-spacing: -.02em;">Phiếu chờ điền thông tin</h1>
 <p class="muted" style="margin-top: 0;">
-  Worker phát hiện các dòng dưới đây thiếu thông tin bắt buộc để tạo PGH (SĐT, địa chỉ, cân nặng…).
-  Điền đầy đủ → worker lần sau (~5 phút) sẽ tự tạo PGH ViettelPost + PGH kho đến.
+  Hệ thống phát hiện các dòng dưới đây còn thiếu thông tin bắt buộc để tạo phiếu giao hàng (SĐT, địa chỉ, cân nặng…).
+  Điền đầy đủ → trong ít phút (~5 phút) hệ thống sẽ tự tạo PGH Viettel Post và PGH kho đến.
 </p>
 
 {% if items %}
   <div class="card compact">
     <strong style="color: var(--kk-warn);">⚠ {{ total_items }} phiếu đang chờ</strong>
     <span class="muted" style="margin-left:.5rem;">
-      Hiển thị {{ items|length }} dòng trong trang này. Sau khi điền, dòng sẽ biến mất khỏi danh sách và xuất hiện lại trong tab "Vận đơn" với mã PGH.
+      Hiển thị {{ items|length }} dòng trong trang này. Sau khi điền, dòng sẽ biến mất khỏi danh sách và xuất hiện lại trong mục "Vận đơn" kèm mã PGH.
     </span>
   </div>
 
@@ -71,8 +71,8 @@
         </div>
 
         <div class="row" style="margin-top: .85rem;">
-          <button class="btn" type="submit">Lưu &amp; chờ worker tạo PGH</button>
-          <span class="muted" style="font-size: 12px;">Sau khi lưu, worker sẽ tạo PGH trong vòng 5 phút tới.</span>
+          <button class="btn" type="submit">Lưu &amp; chờ tạo PGH</button>
+          <span class="muted" style="font-size: 12px;">Sau khi lưu, hệ thống sẽ tạo PGH trong vòng 5 phút tới.</span>
         </div>
       </form>
     </div>
@@ -81,7 +81,7 @@
 {% else %}
   <div class="card">
     <p class="muted" style="margin: 0;">
-      ✓ Không có phiếu nào chờ điền. Mọi dòng Viettel đều đã đủ thông tin để worker tạo PGH tự động.
+      ✓ Không có phiếu nào chờ điền. Mọi dòng Viettel đều đã đủ thông tin để hệ thống tự tạo PGH.
     </p>
   </div>
 {% endif %}
