@@ -55,7 +55,52 @@ def _as_list(d: Any) -> list[dict]:
     return []
 
 
-# ===== Tra khách (GIỐNG trang quản lý: gateway get-customer-code) =====
+# ===== Tra khách (GIỐNG trang Danh sách khách hàng: list-server-side-parent) =====
+
+# Cột DataTables của trang danh sách khách hàng (server cần để biết cột searchable).
+_CUST_COLS = [
+    {"data": d, "name": "", "searchable": True, "orderable": False, "search": {"value": "", "regex": False}}
+    for d in [
+        "isHaveChild", "id", "code", "name", "userManager", "nhomBangGiaSanStr",
+        "isNotActive", "isApprovedStatus", "createDate", "updateDate", "id",
+    ]
+]
+
+
+def tim_khach_list(term: str, length: int = 20) -> list[dict]:
+    """POST customer/api/list-server-side-parent (searchAll=term) — tra khách GIỐNG trang
+    Danh sách khách hàng. `name` = TÊN THẬT, `displayName` = mã. searchAll khớp mã + tên
+    (KHÔNG khớp sđt); không có → rỗng (dùng để báo "chưa có → tạo tài khoản").
+
+    LƯU Ý: `id` ở đây là INT (kinkinId) — KHÔNG phải GUID. Tạo PGH cần GUID → resolve
+    code→GUID qua core (kc.lay_customer_id) ở bước chọn khách.
+    """
+    term = (term or "").strip()
+    if not term:
+        return []
+    body = {
+        "draw": 1, "columns": _CUST_COLS, "order": [], "start": 0, "length": length,
+        "search": {"value": "", "regex": False}, "searchAll": term,
+        "nguoiQuanLy": None, "trangThaiHoatDong": "", "bangGiaSanId": 0,
+    }
+    data = _post("/customer/api/list-server-side-parent", body)
+    rows = data.get("data") if isinstance(data, dict) else (data or [])
+    out: list[dict] = []
+    for r in rows or []:
+        out.append(
+            {
+                "id": r.get("id"),  # INT kinkinId, KHÔNG phải GUID
+                "code": r.get("code"),
+                "name": r.get("name"),
+                "displayName": r.get("displayName"),
+                "phone": r.get("phone"),
+                "paymentType": r.get("paymentType"),
+                "groupName": r.get("groupName"),
+                "address": r.get("address"),
+            }
+        )
+    return out
+
 
 def tim_khach(term: str, is_parent: Optional[bool] = None) -> list[dict]:
     """POST KhoDen/DeliveryOrders/api/get-customer-code — typeahead khách GIỐNG trang quản lý.

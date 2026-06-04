@@ -66,7 +66,16 @@
         </div>
       {% endif %}
 
-      {% if loi_khach %}
+      {% if khach_chua_co %}
+        <div style="border:1px solid var(--kk-error); background:var(--kk-error-bg); border-radius:8px; padding:.7rem .8rem;">
+          <div style="color:var(--kk-error); font-weight:600; margin-bottom:.25rem;">⚠ Khách hàng chưa có trong hệ thống</div>
+          <div style="font-size:13px; color:var(--kk-ink-soft);">
+            Không tìm thấy <code>{{ customer_code }}</code> trong danh sách khách hàng (tìm theo mã &amp; tên).
+            Vui lòng <strong>tạo tài khoản cho khách hàng</strong> trước khi lên phiếu giao hàng.
+          </div>
+          <a class="btn sm" style="margin-top:.5rem;" href="{{ quanly_khach_url }}" target="_blank" rel="noopener">+ Tạo tài khoản khách hàng ↗</a>
+        </div>
+      {% elif loi_khach %}
         <div class="badge warn dot">{{ loi_khach }}</div>
         <div class="muted" style="margin-top:.4rem;">Gõ tên hoặc mã khách rồi bấm <strong>Tra khách</strong> (gợi ý hiện khi gõ ≥ 2 ký tự).</div>
       {% elif khach %}

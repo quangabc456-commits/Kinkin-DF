@@ -44,20 +44,26 @@ def _can_nang_float(ds: DuLieuSheet) -> float:
 
 
 def _tim_khach(session: Session, term: str) -> list[dict]:
-    """Tra khách GIỐNG trang quản lý: LIVE core `get-list-customer-by-search` trước
-    (đầy đủ, cùng endpoint lúc tạo PGH), fallback cache kd_khach_hang khi:
-      - thiếu token / lỗi mạng, HOẶC
-      - live trả rỗng (vd gõ theo TÊN: live tìm theo mã → cache ILIKE tên mới khớp).
+    """Tra khách GIỐNG trang Danh sách khách hàng (gateway list-server-side-parent,
+    searchAll = TÊN/mã thật) → fallback core get-list-customer-by-search → fallback cache.
+
+    Gateway list ưu tiên vì `name` là TÊN THẬT (gõ tên khớp được); core/cache chủ yếu theo mã.
     """
     term = (term or "").strip()
     if not term:
         return []
     try:
+        gw = qc.tim_khach_list(term)
+        if gw:
+            return gw
+    except (QuanlyError, KhodenError):
+        pass
+    try:
         live = kc.tim_khach(term)
+        if live:
+            return live
     except KhodenError:
-        live = []
-    if live:
-        return live
+        pass
     return doc.tim_khach(session, term, limit=25)
 
 
@@ -71,7 +77,7 @@ def api_tim_khach(q: str = "", session: Session = Depends(get_db)):
     return [
         {
             "code": r.get("code"),
-            "name": r.get("displayName") or r.get("name"),
+            "name": r.get("name") or r.get("displayName"),  # ưu tiên TÊN THẬT (gateway list)
             "phone": r.get("phone"),
         }
         for r in rows
@@ -96,6 +102,8 @@ def form_tao_pgh(
         "customer_code": code,
         "khach": None,
         "candidates": [],
+        "khach_chua_co": False,
+        "quanly_khach_url": settings.KK_QUANLY_BASE.rstrip("/") + "/khach-hang/danh-sach-khach-hang",
         "addresses": [],
         "packages": [],
         "tinhs": [],
@@ -108,26 +116,31 @@ def form_tao_pgh(
         "loi_kien": None,
     }
 
-    # ===== Tra khách: LIVE như trang quản lý (đầy đủ) → fallback cache =====
+    # ===== Tra khách như trang Danh sách khách hàng (tên thật) → resolve GUID khi chọn =====
     khach = None
     if code:
         matches = _tim_khach(session, code)
-        # ưu tiên khớp MÃ chính xác (vd 093HN-VAT) khi có nhiều kết quả
         exact = next(
             (m for m in matches if (m.get("code") or "").strip().upper() == code.upper()),
             None,
         )
-        if exact is not None:
-            khach = exact
-        elif len(matches) == 1:
-            khach = matches[0]
+        chosen = exact or (matches[0] if len(matches) == 1 else None)
+        if chosen is not None:
+            # list gateway chỉ có id INT → resolve code→GUID (core) để lấy địa chỉ + tạo PGH
+            full = None
+            try:
+                full = kc.lay_customer_id(chosen.get("code") or code)
+            except KhodenError:
+                full = None
+            khach = full or chosen
+            # giữ TÊN THẬT từ danh sách khách (core hay để name = mã)
+            if khach is full and chosen.get("name") and chosen["name"] != chosen.get("code"):
+                khach["name"] = chosen["name"]
         elif len(matches) > 1:
             ctx["candidates"] = matches  # nhiều khớp → cho user chọn
         else:
-            ctx["loi_khach"] = (
-                f"Không tìm thấy khách khớp {code!r}. Gõ MÃ khách (vd 093HN-VAT) "
-                "hoặc tên; gợi ý hiện khi gõ ≥ 2 ký tự."
-            )
+            # KHÔNG có trong danh sách khách → báo TẠO TÀI KHOẢN cho khách hàng
+            ctx["khach_chua_co"] = True
 
     if khach is not None:
         ctx["khach"] = khach
