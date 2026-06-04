@@ -50,5 +50,25 @@ module.exports = {
       merge_logs: true,
       time: true,
     },
+    {
+      // Kéo dữ liệu tra cứu (khách hàng / địa chỉ / địa danh / kho) về DB mỗi 10'
+      // → màn hình tạo phiếu đọc thẳng từ DB (tức thì), không phải gọi API chờ lâu.
+      name: "kkdf-sync",
+      script: ".venv/Scripts/pythonw.exe",
+      args: "-m app.cli.sync_kho_den --all",
+      cwd: __dirname,
+      interpreter: "none",
+      autorestart: false,
+      cron_restart: "*/10 * * * *",
+      max_memory_restart: "512M",
+      env: {
+        PYTHONIOENCODING: "utf-8",
+        PYTHONUNBUFFERED: "1",
+      },
+      out_file: "./logs/kkdf-sync.out.log",
+      error_file: "./logs/kkdf-sync.err.log",
+      merge_logs: true,
+      time: true,
+    },
   ],
 };

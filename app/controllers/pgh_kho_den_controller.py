@@ -51,15 +51,17 @@ def _la_guid(v) -> bool:
 
 
 def _tim_khach(session: Session, term: str) -> list[dict]:
-    """Tra khách cho ô tìm. Thứ tự:
-      1) get-customer-code (gateway): khớp MÃ theo chuỗi con → 1 mã gốc (vd 093HN) ra
-         NHIỀU khách con (093HN-HT, 093HN-VAT…), mỗi con kèm GUID + tên → orderable luôn.
-      2) list-server-side-parent (gateway): khớp TÊN THẬT (get-customer-code không tìm tên).
-      3) core get-list-customer-by-search → 4) cache kd_khach_hang (offline).
+    """Tra khách — ƯU TIÊN DB (cron giữ tươi mỗi 10') để hiển thị TỨC THÌ:
+      1) DB kd_khach_hang: khớp mã & tên; 1 mã gốc (vd 093HN) → nhiều khách con qua ILIKE;
+         có sẵn GUID để tạo phiếu ngay.
+      2) Khách MỚI chưa kịp đồng bộ → hỏi trực tiếp hệ thống (theo mã kèm khách con, rồi theo tên).
     """
     term = (term or "").strip()
     if not term:
         return []
+    db = doc.tim_khach(session, term, limit=25)
+    if db:
+        return db
     for fn in (lambda: qc.tim_khach(term), lambda: qc.tim_khach_list(term)):
         try:
             r = fn()
@@ -73,7 +75,7 @@ def _tim_khach(session: Session, term: str) -> list[dict]:
             return live
     except KhodenError:
         pass
-    return doc.tim_khach(session, term, limit=25)
+    return []
 
 
 def _resolve_orderable(code: str):
