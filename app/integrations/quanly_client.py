@@ -116,11 +116,12 @@ def tim_khach(term: str, is_parent: Optional[bool] = None) -> list[dict]:
     for r in _as_list(data):
         out.append(
             {
-                "id": r.get("id"),
+                "id": r.get("id"),  # GUID — orderable, dùng tạo PGH luôn
                 "code": r.get("code"),
-                "name": r.get("displayName") or r.get("name"),
+                "name": r.get("name") or r.get("displayName"),
                 "phone": r.get("phone"),
                 "paymentType": r.get("paymentType"),
+                "groupName": r.get("groupName"),
                 "isParent": r.get("isParent"),
             }
         )

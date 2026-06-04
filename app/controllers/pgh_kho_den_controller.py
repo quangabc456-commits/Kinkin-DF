@@ -43,21 +43,28 @@ def _can_nang_float(ds: DuLieuSheet) -> float:
         return 0.0
 
 
-def _tim_khach(session: Session, term: str) -> list[dict]:
-    """Tra khách GIỐNG trang Danh sách khách hàng (gateway list-server-side-parent,
-    searchAll = TÊN/mã thật) → fallback core get-list-customer-by-search → fallback cache.
+def _la_guid(v) -> bool:
+    """id GUID (get-customer-code/core) vs id INT (list-server-side-parent)."""
+    return isinstance(v, str) and len(v) >= 32 and "-" in v
 
-    Gateway list ưu tiên vì `name` là TÊN THẬT (gõ tên khớp được); core/cache chủ yếu theo mã.
+
+def _tim_khach(session: Session, term: str) -> list[dict]:
+    """Tra khách cho ô tìm. Thứ tự:
+      1) get-customer-code (gateway): khớp MÃ theo chuỗi con → 1 mã gốc (vd 093HN) ra
+         NHIỀU khách con (093HN-HT, 093HN-VAT…), mỗi con kèm GUID + tên → orderable luôn.
+      2) list-server-side-parent (gateway): khớp TÊN THẬT (get-customer-code không tìm tên).
+      3) core get-list-customer-by-search → 4) cache kd_khach_hang (offline).
     """
     term = (term or "").strip()
     if not term:
         return []
-    try:
-        gw = qc.tim_khach_list(term)
-        if gw:
-            return gw
-    except (QuanlyError, KhodenError):
-        pass
+    for fn in (lambda: qc.tim_khach(term), lambda: qc.tim_khach_list(term)):
+        try:
+            r = fn()
+            if r:
+                return r
+        except (QuanlyError, KhodenError):
+            pass
     try:
         live = kc.tim_khach(term)
         if live:
@@ -65,6 +72,27 @@ def _tim_khach(session: Session, term: str) -> list[dict]:
     except KhodenError:
         pass
     return doc.tim_khach(session, term, limit=25)
+
+
+def _resolve_orderable(code: str):
+    """code → khách orderable (có GUID) để tạo PGH. get-customer-code trước (đúng GUID +
+    bắt khách con), core sau. Trả dict (1 khách), HOẶC list (mã có nhiều con → cho chọn),
+    HOẶC None (không resolve được).
+    """
+    code = (code or "").strip()
+    try:
+        r = qc.tim_khach(code)
+    except (QuanlyError, KhodenError):
+        r = []
+    if r:
+        exact = next((m for m in r if (m.get("code") or "").strip().upper() == code.upper()), None)
+        if exact is not None:
+            return exact
+        return r[0] if len(r) == 1 else r  # nhiều con → list
+    try:
+        return kc.lay_customer_id(code)
+    except KhodenError:
+        return None
 
 
 @router.get("/api/khach", response_class=JSONResponse)
@@ -116,7 +144,7 @@ def form_tao_pgh(
         "loi_kien": None,
     }
 
-    # ===== Tra khách như trang Danh sách khách hàng (tên thật) → resolve GUID khi chọn =====
+    # ===== Tra khách: get-customer-code (mã + khách con) / list (tên) → đảm bảo GUID orderable =====
     khach = None
     if code:
         matches = _tim_khach(session, code)
@@ -126,21 +154,21 @@ def form_tao_pgh(
         )
         chosen = exact or (matches[0] if len(matches) == 1 else None)
         if chosen is not None:
-            # list gateway chỉ có id INT → resolve code→GUID (core) để lấy địa chỉ + tạo PGH
-            full = None
-            try:
-                full = kc.lay_customer_id(chosen.get("code") or code)
-            except KhodenError:
-                full = None
-            khach = full or chosen
-            # giữ TÊN THẬT từ danh sách khách (core hay để name = mã)
-            if khach is full and chosen.get("name") and chosen["name"] != chosen.get("code"):
-                khach["name"] = chosen["name"]
+            if _la_guid(chosen.get("id")):
+                khach = chosen  # đã orderable (get-customer-code/core)
+            else:
+                # chosen từ list parent (id INT) → resolve code→GUID (có thể ra nhiều khách con)
+                r = _resolve_orderable(chosen.get("code") or code)
+                if isinstance(r, list):
+                    ctx["candidates"] = r  # 1 mã → nhiều khách con → cho chọn
+                else:
+                    khach = r or chosen
+                    if khach and chosen.get("name") and not khach.get("name"):
+                        khach["name"] = chosen["name"]
         elif len(matches) > 1:
-            ctx["candidates"] = matches  # nhiều khớp → cho user chọn
+            ctx["candidates"] = matches  # nhiều khớp (gồm khách con cùng mã gốc) → cho chọn
         else:
-            # KHÔNG có trong danh sách khách → báo TẠO TÀI KHOẢN cho khách hàng
-            ctx["khach_chua_co"] = True
+            ctx["khach_chua_co"] = True  # không có trong danh sách → báo tạo tài khoản
 
     if khach is not None:
         ctx["khach"] = khach
