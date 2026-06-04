@@ -32,7 +32,9 @@ module.exports = {
   apps: [
     {
       name: "kkdf-cron",
-      script: ".venv/Scripts/python.exe",
+      // pythonw.exe = Python KHÔNG cửa sổ console → tránh bật terminal mỗi 5'
+      // (cron_restart spawn lại process; python.exe là console app nên nhảy cửa sổ).
+      script: ".venv/Scripts/pythonw.exe",
       args: "-m app.workers.cron_worker",
       cwd: __dirname,
       interpreter: "none",
