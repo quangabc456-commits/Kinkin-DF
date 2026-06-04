@@ -138,29 +138,12 @@ def trang_chu(
 
 
 @router.post("/chot/{du_lieu_sheet_id}")
-def chot_pgh(
-    du_lieu_sheet_id: int,
-    tai_khoan_vtp_id: Optional[int] = Form(None),
-    sender_fullname: str = Form(""),
-    sender_phone: str = Form(""),
-    sender_address: str = Form(""),
-    session: Session = Depends(get_db),
-):
-    try:
-        pgh = tao_pgh_tu_dong_sheet(
-            session,
-            du_lieu_sheet_id=du_lieu_sheet_id,
-            tai_khoan_vtp_id=tai_khoan_vtp_id,
-            sender_fullname=sender_fullname,
-            sender_phone=sender_phone,
-            sender_address=sender_address,
-            user="ui",
-        )
-        session.commit()
-    except (VtpError, ValueError) as e:
-        session.commit()
-        raise HTTPException(status_code=400, detail=str(e))
-    return RedirectResponse(url=f"/pgh/{pgh.id}", status_code=303)
+def chot_pgh(du_lieu_sheet_id: int):
+    """Luồng VTP trực tiếp CŨ đã thay bằng màn hình tạo PGH hợp nhất (kho đến + VTP qua
+    gateway). Chuyển hướng mọi nút 'Chốt PGH' cũ (trang cache/bản cũ) sang màn hình mới —
+    tránh lỗi 'LoginVTP: system error' do gọi VTP trực tiếp bằng token.
+    """
+    return RedirectResponse(url=f"/pgh/kho-den/{du_lieu_sheet_id}", status_code=303)
 
 
 @router.get("/pgh/{pgh_id}", response_class=HTMLResponse)
