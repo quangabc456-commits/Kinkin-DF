@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 from app.core.config import settings
 from app.integrations import khoden_client as kc
+from app.integrations import quanly_client as qc
 
 
 class KhoDenServiceError(Exception):
@@ -229,7 +230,7 @@ def tao_pgh_dia_chi_cu(
     if not khach:
         raise KhoDenServiceError(f"Không tìm thấy khách {customer_code!r}")
     body = build_body_pgh(khach=khach, address_id=address_id, packages=packages, **kwargs)
-    resp = kc.tao_pgh(body)
+    resp = qc.tao_pgh(body)  # tạo qua gateway quanly → kho đến + VTP (partner*) trong 1 call
     return {"resp": resp, "request": body, "khach": khach}
 
 
@@ -251,5 +252,5 @@ def tao_pgh_dia_chi_moi(
         raise KhoDenServiceError(f"Không tìm thấy khách {customer_code!r}")
     dc = tao_dia_chi_moi(khach, receiver, receive_phone, ten_tinh, ten_huyen, ten_xa, address)
     body = build_body_pgh(khach=khach, address_id=dc["addressId"], packages=packages, **kwargs)
-    resp = kc.tao_pgh(body)
+    resp = qc.tao_pgh(body)  # tạo qua gateway quanly → kho đến + VTP (partner*) trong 1 call
     return {"resp": resp, "request": body, "khach": khach, "dia_chi": dc}

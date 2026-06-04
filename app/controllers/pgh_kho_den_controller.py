@@ -19,7 +19,9 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.core.templates import templates
 from app.integrations import khoden_client as kc
+from app.integrations import quanly_client as qc
 from app.integrations.khoden_client import KhodenError
+from app.integrations.quanly_client import QuanlyError
 from app.models import DuLieuSheet, PhieuGiaoHang
 from app.services.tao_pgh_hop_nhat import luu_ket_qua
 from app.services.tao_pgh_kho_den import (
@@ -95,10 +97,10 @@ def form_tao_pgh(
         ctx["tinhs"] = kc.ds_tinh()
     except KhodenError:
         ctx["tinhs"] = []
-    # Đối tác vận chuyển (VTP) + kho — cho block VTP (1-call hợp nhất)
+    # Đối tác vận chuyển (VTP) qua GATEWAY quanly (1-call hợp nhất) + kho
     try:
-        ctx["doi_tac"] = kc.ds_doi_tac_vc()
-    except KhodenError:
+        ctx["doi_tac"] = qc.ds_doi_tac()
+    except (QuanlyError, KhodenError):
         ctx["doi_tac"] = []
     try:
         ctx["khos"] = kc.ds_kho()
@@ -246,7 +248,7 @@ def submit_tao_pgh(
                 address_id=address_id.strip(),
                 **chung,
             )
-    except (KhoDenServiceError, KhodenError) as e:
+    except (KhoDenServiceError, KhodenError, QuanlyError) as e:
         # Ghi lại thất bại (nếu đã có khách/đơn) để theo dõi trên danh sách
         try:
             luu_ket_qua(

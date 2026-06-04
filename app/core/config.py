@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     KK_BASE_KHODEN_CORE: str = "https://kinkincoreapi.vanchuyenkinkin.com"   # khách + địa danh
     # ID đối tác vận chuyển Viettel Post trên hệ kho đến (tạo PGH kho đến + VTP trong 1 call)
     VIETTELPOST_PARTNER_ID: int = 1002
+    # Gateway quanly (hệ Tài chính) — tạo PGH kho đến + VTP 1-call qua partner*.
+    # Auth: cookie access_token = token identityapi (cùng token khoden_client lấy). KHÔNG phải Bearer.
+    KK_QUANLY_BASE: str = "https://quanly.vanchuyenkinkin.com"
     # Tài khoản kho đến hệ THẬT (CẦN cấp tài khoản vanchuyenkinkin.com có quyền WarehouseExport;
     # tài khoản nvadmin của dion.vn KHÔNG dùng được trên hệ thật)
     KK_KHODEN_USERNAME: str = ""

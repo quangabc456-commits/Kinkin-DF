@@ -6,7 +6,11 @@
 ## Kiến trúc
 - `quanly.vanchuyenkinkin.com` là **GATEWAY** (ASP.NET MVC + jQuery, theme Metronic), KHÔNG phải SPA.
 - Mọi AJAX qua wrapper `httpService` → URL = **`systemURL + <path>`**, `systemURL = https://quanly.vanchuyenkinkin.com/`.
-- **Auth: `Authorization: Bearer <localStorage.token>`** (JWT lưu trong `localStorage.token`).
+- **Auth: cookie `access_token=<JWT>`** (ĐÃ XÁC MINH qua header request thật — KHÔNG phải Authorization Bearer).
+  JWT do `identityapi.vanchuyenkinkin.com` cấp (iss/client_id=Kinkin, aud gồm WarehouseExportService,
+  scope Identity/KinkinCore/KinkinReport/WarehouseExport) — **CÙNG token `khoden_client._lay_token()` lấy**
+  (password grant lexuantruong). → `app/integrations/quanly_client.py` gửi token này qua cookie để gọi gateway.
+- **ĐÃ TÍCH HỢP:** tạo PGH route qua gateway (`quanly_client.tao_pgh`) → kho đến + VTP (partner*) trong 1 call.
 - Gateway định tuyến theo **prefix** tới backend: `KhoDen/...`, `CommonKDN/...`, `vckk/...`, `menu/...`, `notification/...`, `tblProduct/...`, `DeliveryOrderPartnerTracking/...`, `printbarcode/...`, `reference/...`.
 - Prefix `KhoDen/deliveryorders/api/` (gateway) ↔ tương ứng backend trực tiếp `warehouseexportapi.vanchuyenkinkin.com/warehouseexport/api/deliveryorders/` (mà `khoden_client.py` đang gọi). **Path action giống nhau.**
 
