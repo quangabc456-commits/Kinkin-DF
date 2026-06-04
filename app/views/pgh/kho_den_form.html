@@ -195,6 +195,7 @@
         </div>
       </div>
 
+      {% if doi_tac %}
       <div class="card">
         <div class="card-title">🚀 Đối tác giao ngoài (VTP) — tuỳ chọn</div>
         <div style="display:flex; flex-direction:column; gap:.2rem; max-width:340px; margin-bottom:.6rem;">
@@ -263,6 +264,11 @@
           <div class="muted" style="font-size:11px; margin-top:.4rem;">Mã dịch vụ + giá cước có thể tra qua báo giá VTP (sẽ bổ sung nút báo giá ở bước sau).</div>
         </div>
       </div>
+      {% else %}
+      <div class="card">
+        <div class="muted" style="font-size:12.5px;">ℹ Tạo <strong>PGH kho đến</strong>. (Đơn VTP đồng thời chưa khả dụng qua API trực tiếp — cần qua gateway/bước riêng.)</div>
+      </div>
+      {% endif %}
 
       <div class="row between">
         <div class="muted">Tạo PGH kho đến<span id="vtp-note"></span> trong 1 lần.</div>
