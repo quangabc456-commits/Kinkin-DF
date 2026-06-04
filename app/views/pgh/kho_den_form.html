@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Tạo PGH kho đến — {{ ds.ma_van_don }}{% endblock %}
+{% block content %}
+
+<div class="row between" style="margin-bottom:1rem;">
+  <div>
+    <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.05em;">Tạo phiếu giao hàng · Kho đến (dion.vn)</div>
+    <h1 style="margin:.2rem 0 0; font-size:20px; letter-spacing:-.01em;">
+      Vận đơn <code style="font-size:16px;">{{ ds.ma_van_don }}</code>
+    </h1>
+  </div>
+  <a class="btn ghost sm" href="/">← Về danh sách</a>
+</div>
+
+{% if loi_cau_hinh %}
+  <div class="card" style="border-color:var(--kk-error); background:var(--kk-error-bg);">
+    <div class="card-title" style="color:var(--kk-error);">⚠ Chưa cấu hình tài khoản hệ kho đến</div>
+    <div style="font-size:13.5px; color:var(--kk-ink-soft);">{{ loi_cau_hinh }}</div>
+    <div class="muted" style="margin-top:.5rem;">Bổ sung <code>KK_KHODEN_USERNAME</code> / <code>KK_KHODEN_PASSWORD</code> vào <code>.env</code> rồi tải lại.</div>
+  </div>
+{% endif %}
+
+<div style="display:grid; grid-template-columns: minmax(340px, 1fr) minmax(420px, 1.2fr); gap:1rem; align-items:start;">
+
+  <!-- ============ CỘT TRÁI: thông tin nguồn + khách + chọn mã khách ============ -->
+  <div>
+    <div class="card">
+      <div class="card-title">📑 Đơn hàng (map từ sheet)</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:.45rem .85rem; font-size:13px;">
+        <div><label>Kiện K</label><div>{{ ds.ma_kien_k or '—' }}</div></div>
+        <div><label>F cha</label><div>{{ ds.ma_f_cha or '—' }}</div></div>
+        <div><label>Thùng (F con)</label><div>{{ ds.ma_thung or '—' }}</div></div>
+        <div><label>Phương thức gửi</label><div>{{ ds.phuong_thuc_gui or '—' }}</div></div>
+        <div><label>SĐT người nhận</label><div>{{ ds.sdt_nguoi_nhan or '—' }}</div></div>
+        <div><label>Cân nặng (kg)</label><div>{{ ds.can_nang_kg or ds.can_nang_kien_kg or '—' }}</div></div>
+        <div style="grid-column:1 / -1;"><label>Địa chỉ (sheet)</label><div>{{ ds.dia_chi_nguoi_nhan or '—' }}</div></div>
+        <div style="grid-column:1 / -1;"><label>Ghi chú</label><div>{{ ds.ghi_chu or '—' }}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👤 Khách hàng (hệ kho đến)</div>
+      <form method="get" action="/pgh/kho-den/{{ ds.id }}" class="row" style="gap:.5rem; margin-bottom:.6rem;">
+        <input type="text" name="customer_code" value="{{ customer_code }}" placeholder="Mã khách, vd 093HN-VAT" style="flex:1; min-width:160px;">
+        <button class="btn sm" type="submit">Tra khách</button>
+      </form>
+
+      {% if loi_khach %}
+        <div class="badge warn dot">{{ loi_khach }}</div>
+        <div class="muted" style="margin-top:.4rem;">Nhập đúng mã khách rồi bấm <strong>Tra khách</strong>.</div>
+      {% elif khach %}
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:.4rem .85rem; font-size:13px;">
+          <div><label>Mã khách</label><div><code>{{ khach.code }}</code></div></div>
+          <div><label>Tên</label><div>{{ khach.name or '—' }}</div></div>
+          <div><label>SĐT</label><div>{{ khach.phone or '—' }}</div></div>
+          <div><label>Nhóm</label><div>{{ khach.groupName or '—' }}</div></div>
+          <div style="grid-column:1 / -1;"><label>customerId</label><div><code style="font-size:11px;">{{ khach.id }}</code></div></div>
+        </div>
+      {% else %}
+        <div class="muted">Nhập mã khách để tra cứu trên hệ kho đến.</div>
+      {% endif %}
+    </div>
+
+    {% if khach %}
+    <div class="card">
+      <div class="card-title">📦 Kiện F — chọn kiện lên PGH</div>
+      {% if loi_kien %}
+        <div class="badge err dot">{{ loi_kien }}</div>
+      {% elif packages %}
+        <div class="muted" style="margin-bottom:.5rem;">Chỉ chọn kiện <strong>đang tồn ở kho đến</strong> (chưa giao). Tích các kiện cần lên phiếu.</div>
+        <div class="table-wrap" style="max-height:340px;">
+          <table>
+            <thead><tr><th style="width:34px;"></th><th>Mã F</th><th>Tên F</th><th>Trạng thái</th><th class="nowrap">Cân (kg)</th></tr></thead>
+            <tbody>
+              {% for f in packages %}
+                {% set st = f.currentPackageFStatus %}
+                <tr>
+                  <td><input form="form-pgh" type="checkbox" name="package_tokens" value="{{ f.packageFId }}|{{ f.packageFCode }}"></td>
+                  <td class="nowrap"><code>{{ f.packageFCode }}</code></td>
+                  <td>{{ f.packageFName or '—' }}</td>
+                  <td class="nowrap"><span class="badge {% if st in [10, 8] %}neutral{% else %}ok{% endif %} dot">{{ f.packageFStatusName or st }}</span></td>
+                  <td class="nowrap">{{ f.packageFWeight or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="badge warn dot">Khách này không có kiện F nào ở kho đến.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ============ CỘT PHẢI: form tạo PGH ============ -->
+  <div>
+    {% if khach %}
+    <form method="post" action="/pgh/kho-den/{{ ds.id }}" id="form-pgh"
+          onsubmit="if(!confirm('Tạo PGH cho vận đơn {{ ds.ma_van_don }}?'))return false; var b=this.querySelector('button[type=submit]'); if(b){b.disabled=true; b.textContent='Đang tạo...';} return true;">
+      <input type="hidden" name="customer_code" value="{{ khach.code }}">
+
+      <div class="card">
+        <div class="card-title">📍 Địa chỉ người nhận</div>
+        <div class="row" style="gap:1rem; margin-bottom:.7rem;">
+          <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer; color:var(--kk-ink);">
+            <input type="radio" name="che_do_dia_chi" value="cu" checked onchange="khoden_toggleAddr()"> Địa chỉ đã có
+          </label>
+          <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer; color:var(--kk-ink);">
+            <input type="radio" name="che_do_dia_chi" value="moi" onchange="khoden_toggleAddr()"> Tạo địa chỉ mới
+          </label>
+        </div>
+
+        <!-- ĐỊA CHỈ ĐÃ CÓ -->
+        <div id="addr-cu">
+          {% if loi_dia_chi %}
+            <div class="badge err dot">{{ loi_dia_chi }}</div>
+          {% elif addresses %}
+            <div class="table-wrap" style="max-height:300px;">
+              <table>
+                <thead><tr><th style="width:34px;"></th><th>Người nhận</th><th>SĐT</th><th>Khu vực</th><th>Địa chỉ</th></tr></thead>
+                <tbody>
+                  {% for a in addresses %}
+                    <tr>
+                      <td><input type="radio" name="address_id" value="{{ a.id }}" {% if loop.first %}checked{% endif %}></td>
+                      <td>{{ a.receiver or '—' }}</td>
+                      <td class="nowrap">{{ a.phone or '—' }}</td>
+                      <td>{{ a.wardName }}, {{ a.districtName }}, {{ a.provinceName }}</td>
+                      <td><div class="addr">{{ a.address or '—' }}</div></td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="badge warn dot">Khách chưa có địa chỉ nào — hãy chọn "Tạo địa chỉ mới".</div>
+          {% endif %}
+        </div>
+
+        <!-- ĐỊA CHỈ MỚI -->
+        <div id="addr-moi" style="display:none;">
+          <div class="muted" style="margin-bottom:.6rem;">Nhập tên Tỉnh / Quận-Huyện / Phường-Xã đúng như hệ kho đến (hệ thống tự khớp, không phân biệt dấu/hoa-thường).</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:.6rem;">
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="receiver">Tên người nhận</label>
+              <input type="text" id="receiver" name="receiver" value="{{ ds.ten_kh or '' }}">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="receive_phone">SĐT người nhận</label>
+              <input type="text" id="receive_phone" name="receive_phone" value="{{ ds.sdt_nguoi_nhan or '' }}">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="ten_tinh">Tỉnh / Thành phố</label>
+              <input type="text" id="ten_tinh" name="ten_tinh" list="dl-tinh" placeholder="vd Hà Nội">
+              <datalist id="dl-tinh">
+                {% for t in tinhs %}<option value="{{ t.name }}">{% endfor %}
+              </datalist>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="ten_huyen">Quận / Huyện</label>
+              <input type="text" id="ten_huyen" name="ten_huyen" placeholder="vd Quận Hà Đông">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="ten_xa">Phường / Xã</label>
+              <input type="text" id="ten_xa" name="ten_xa" placeholder="vd Kiến Hưng">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="address">Địa chỉ chi tiết</label>
+              <input type="text" id="address" name="address" value="{{ ds.dia_chi_nguoi_nhan or '' }}" placeholder="Số nhà, đường...">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🚚 Thông tin giao hàng</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.6rem;">
+          <div style="display:flex; flex-direction:column; gap:.2rem;">
+            <label for="delivery_method_id">Hình thức giao (deliveryMethodId)</label>
+            <input type="number" id="delivery_method_id" name="delivery_method_id" value="2" min="1">
+            <span class="muted" style="font-size:11px;">2 = Giao hàng trực tiếp (đã xác minh)</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:.2rem;">
+            <label for="received_date">Ngày hẹn giao (tuỳ chọn)</label>
+            <input type="datetime-local" id="received_date" name="received_date">
+          </div>
+          <div style="display:flex; flex-direction:column; gap:.2rem; grid-column:1 / -1;">
+            <label for="note">Ghi chú phiếu</label>
+            <textarea id="note" name="note" rows="2">{{ ds.ghi_chu or '' }}</textarea>
+          </div>
+          <div style="grid-column:1 / -1;">
+            <label style="display:flex; align-items:center; gap:.45rem; cursor:pointer; color:var(--kk-ink);">
+              <input type="checkbox" name="is_draft" value="true" checked> Lưu nháp (isDraft) — bỏ tích để tạo phiếu chính thức
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🚀 Đối tác giao ngoài (VTP) — tuỳ chọn</div>
+        <div style="display:flex; flex-direction:column; gap:.2rem; max-width:340px; margin-bottom:.6rem;">
+          <label for="delivery_partner_id">Đối tác vận chuyển</label>
+          <select id="delivery_partner_id" name="delivery_partner_id" onchange="khoden_toggleVtp()">
+            <option value="0">— Không dùng (chỉ tạo PGH kho đến) —</option>
+            {% for d in doi_tac %}
+              <option value="{{ d.id }}">{{ d.name }}</option>
+            {% endfor %}
+          </select>
+          <span class="muted" style="font-size:11px;">Chọn <strong>Viettel Post</strong> để tạo đồng thời đơn VTP trong cùng 1 lần (1-call).</span>
+        </div>
+
+        <div id="vtp-fields" style="display:none;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:.6rem;">
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_service">Mã dịch vụ VTP</label>
+              <input type="text" id="vtp_service" name="vtp_service" placeholder="vd VCN / VHT">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_payment">Người trả cước</label>
+              <input type="number" id="vtp_payment" name="vtp_payment" value="1" min="1">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_cod">Tiền thu hộ COD (VND)</label>
+              <input type="text" id="vtp_cod" name="vtp_cod" value="0">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_price">Giá trị hàng (VND)</label>
+              <input type="text" id="vtp_price" name="vtp_price" value="0">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem; grid-column:span 2;">
+              <label for="vtp_product_name">Tên đơn hàng (VTP)</label>
+              <input type="text" id="vtp_product_name" name="vtp_product_name" value="{{ ds.nhom_san_pham or '' }}">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_length">Dài (cm)</label>
+              <input type="number" id="vtp_length" name="vtp_length" value="0" min="0">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_width">Rộng (cm)</label>
+              <input type="number" id="vtp_width" name="vtp_width" value="0" min="0">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_height">Cao (cm)</label>
+              <input type="number" id="vtp_height" name="vtp_height" value="0" min="0">
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.6rem;">
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_warehouse_name">Kho gửi</label>
+              <select id="vtp_warehouse_name" name="vtp_warehouse_name">
+                <option value="">— Chọn kho gửi —</option>
+                {% for k in khos %}<option value="{{ k.name }}">{{ k.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem;">
+              <label for="vtp_warehouse_phone">SĐT kho gửi</label>
+              <input type="text" id="vtp_warehouse_phone" name="vtp_warehouse_phone">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.2rem; grid-column:1 / -1;">
+              <label for="vtp_warehouse_address">Địa chỉ kho gửi</label>
+              <input type="text" id="vtp_warehouse_address" name="vtp_warehouse_address">
+            </div>
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:.4rem;">Mã dịch vụ + giá cước có thể tra qua báo giá VTP (sẽ bổ sung nút báo giá ở bước sau).</div>
+        </div>
+      </div>
+
+      <div class="row between">
+        <div class="muted">Tạo PGH kho đến<span id="vtp-note"></span> trong 1 lần.</div>
+        <button class="btn" type="submit">Tạo PGH</button>
+      </div>
+    </form>
+    {% else %}
+    <div class="card">
+      <div class="muted">Tra cứu khách hàng (cột trái) trước khi tạo phiếu giao hàng.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  var VTP_PARTNER_ID = {{ vtp_partner_id|default(1002) }};
+  function khoden_toggleAddr() {
+    var moi = document.querySelector('input[name="che_do_dia_chi"]:checked').value === 'moi';
+    document.getElementById('addr-cu').style.display = moi ? 'none' : '';
+    document.getElementById('addr-moi').style.display = moi ? '' : 'none';
+  }
+  function khoden_toggleVtp() {
+    var sel = document.getElementById('delivery_partner_id');
+    var box = document.getElementById('vtp-fields');
+    var note = document.getElementById('vtp-note');
+    if (!sel || !box) return;
+    var on = parseInt(sel.value || '0', 10) === VTP_PARTNER_ID;
+    box.style.display = on ? '' : 'none';
+    if (note) note.textContent = on ? ' + đơn VTP' : '';
+  }
+  khoden_toggleAddr();
+  khoden_toggleVtp();
+</script>
+
+{% endblock %}

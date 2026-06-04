@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.controllers.cau_hinh_controller import router as router_cau_hinh
 from app.controllers.kinkin_controller import router as router_kinkin
 from app.controllers.pgh_cho_dien_controller import router as router_pgh_cho_dien
+from app.controllers.pgh_kho_den_controller import router as router_pgh_kho_den
 from app.controllers.pgh_controller import router as router_pgh
 from app.controllers.webhook_controller import router as router_webhook
 from app.core.config import settings
@@ -19,6 +20,7 @@ app.include_router(router_webhook)
 app.include_router(router_cau_hinh)
 app.include_router(router_kinkin)
 app.include_router(router_pgh_cho_dien)
+app.include_router(router_pgh_kho_den)
 app.include_router(router_pgh)
 
 

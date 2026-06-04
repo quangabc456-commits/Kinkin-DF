@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Kết quả tạo PGH kho đến — {{ ds.ma_van_don }}{% endblock %}
+{% block content %}
+
+<div class="row between" style="margin-bottom:1rem;">
+  <div>
+    <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.05em;">Kết quả tạo PGH · Kho đến</div>
+    <h1 style="margin:.2rem 0 0; font-size:20px;">Vận đơn <code style="font-size:16px;">{{ ds.ma_van_don }}</code></h1>
+  </div>
+  <div class="row" style="gap:.5rem;">
+    <a class="btn ghost sm" href="/pgh/kho-den/{{ ds.id }}?customer_code={{ customer_code }}">← Tạo lại</a>
+    <a class="btn ghost sm" href="/">Về danh sách</a>
+  </div>
+</div>
+
+{% if ok %}
+  <div class="card" style="border-color:var(--kk-success); background:var(--kk-success-bg);">
+    <div class="card-title" style="color:var(--kk-success);">{% if da_ton_tai %}ℹ Vận đơn này đã có PGH kho đến{% else %}✓ Đã tạo PGH kho đến{% if pgh and pgh.ma_pgh_vtp %} + đơn VTP{% endif %}{% if is_draft %} (bản nháp){% endif %}{% endif %}</div>
+    <div style="font-size:13.5px; color:var(--kk-ink-soft);">
+      {% if da_ton_tai %}
+        Không tạo lại để tránh trùng đơn trên hệ kho đến. Nếu cần tạo phiếu khác, kiểm tra/huỷ phiếu cũ trước.
+      {% else %}
+        Gửi lên hệ kho đến thành công với {{ req_body.packageDeliveryDtos|length if req_body else '?' }} kiện F.
+      {% endif %}
+    </div>
+    {% if pgh %}
+      <div class="muted" style="margin-top:.5rem;">
+        Đã lưu DB (phieu_giao_hang #{{ pgh.id }}){% if pgh.ma_pgh_kinkin %} · Mã PGH kho đến <code>{{ pgh.ma_pgh_kinkin }}</code>{% endif %}{% if pgh.ma_pgh_vtp %} · Mã VTP <code>{{ pgh.ma_pgh_vtp }}</code>{% endif %}
+      </div>
+    {% endif %}
+    {% if dia_chi %}
+      <div class="muted" style="margin-top:.35rem;">
+        Địa chỉ: {{ 'tạo mới' if dia_chi.tao_moi else 'dùng địa chỉ đã có' }} · addressId <code style="font-size:11px;">{{ dia_chi.addressId }}</code>
+      </div>
+    {% endif %}
+  </div>
+  {% if canh_bao %}
+    <div class="card" style="border-color:var(--kk-warn); background:var(--kk-warn-bg);">
+      <div style="font-size:13.5px; color:var(--kk-warn);">⚠ {{ canh_bao }}</div>
+    </div>
+  {% endif %}
+  {% if co_vtp and not da_ton_tai and not (pgh and pgh.ma_pgh_vtp) %}
+    <div class="card" style="border-color:var(--kk-warn); background:var(--kk-warn-bg);">
+      <div style="font-size:13.5px; color:var(--kk-warn);">⚠ PGH kho đến đã tạo, nhưng chưa xác nhận được mã đơn VTP — kiểm tra lại trên hệ thống.</div>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="card" style="border-color:var(--kk-error); background:var(--kk-error-bg);">
+    <div class="card-title" style="color:var(--kk-error);">{% if db_loi %}⚠ Tạo trên hệ kho đến OK — nhưng GHI DB thất bại{% else %}✗ Tạo PGH thất bại{% endif %}</div>
+    <div style="font-size:13.5px; color:var(--kk-ink-soft); white-space:pre-wrap;">{{ loi }}</div>
+  </div>
+{% endif %}
+
+{% if resp %}
+<div class="card">
+  <div class="card-title">Response từ API</div>
+  <pre style="max-height:320px;">{{ resp | tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+
+{% if req_body %}
+<details class="card">
+  <summary style="cursor:pointer; font-weight:600;">Request body đã gửi (debug)</summary>
+  <pre style="max-height:420px; margin-top:.7rem;">{{ req_body | tojson(indent=2) }}</pre>
+</details>
+{% endif %}
+
+{% endblock %}

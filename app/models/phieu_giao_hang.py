@@ -23,8 +23,8 @@ class PhieuGiaoHang(Base):
     du_lieu_sheet_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("du_lieu_sheet.id", ondelete="RESTRICT"), nullable=False
     )
-    tai_khoan_vtp_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("tai_khoan_vtp.id", ondelete="RESTRICT"), nullable=False
+    tai_khoan_vtp_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("tai_khoan_vtp.id", ondelete="RESTRICT"), nullable=True
     )
 
     ma_pgh_vtp: Mapped[Optional[str]] = mapped_column(Text, unique=True)
@@ -90,7 +90,7 @@ class PhieuGiaoHang(Base):
     thieu_truong_json: Mapped[Optional[list]] = mapped_column(JSONB)
 
     dong_sheet: Mapped["DuLieuSheet"] = relationship(back_populates="phieu_giao_hang")
-    tai_khoan_vtp: Mapped["TaiKhoanVtp"] = relationship(back_populates="phieu_giao_hang")
+    tai_khoan_vtp: Mapped[Optional["TaiKhoanVtp"]] = relationship(back_populates="phieu_giao_hang")
     hanh_trinh: Mapped[list["HanhTrinhPgh"]] = relationship(back_populates="pgh")
 
     __table_args__ = (
