@@ -8,6 +8,7 @@ Luồng:
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -117,13 +118,17 @@ def form_tao_pgh(
     ds_id: int,
     request: Request,
     customer_code: Optional[str] = None,
+    warehouse_id: int = 0,  # Kho đến đang chọn (0 = mặc định) — lọc kiện F theo kho
     session: Session = Depends(get_db),
 ):
     ds = session.get(DuLieuSheet, ds_id)
     if ds is None:
         raise HTTPException(404, f"Không tìm thấy vận đơn id={ds_id}")
 
-    code = (customer_code or ds.ten_kh or "").strip()
+    # Chỉ tra khi user thực sự nhập mã/tên (KHÔNG auto theo ten_kh — đơn Viettel ten_kh là
+    # người nhận, không phải mã khách → tránh báo nhầm "khách chưa có" ngay khi mở trang).
+    code = (customer_code or "").strip()
+    cur_warehouse_id = warehouse_id or int(settings.DEFAULT_KHO_DEN_ID or 5)
     ctx = {
         "request": request,
         "ds": ds,
@@ -138,6 +143,11 @@ def form_tao_pgh(
         "doi_tac": [],
         "khos": [],
         "vtp_partner_id": settings.VIETTELPOST_PARTNER_ID,
+        "nguoi_tao": settings.KK_KHODEN_USERNAME or "—",
+        "hom_nay": date.today().strftime("%d/%m/%Y"),
+        "cur_warehouse_id": cur_warehouse_id,
+        "tong_kien": 0,
+        "tong_can": 0.0,
         "loi_cau_hinh": None,
         "loi_khach": None,
         "loi_dia_chi": None,
@@ -182,9 +192,11 @@ def form_tao_pgh(
                 pass
         # Kiện F: GIỮ LIVE (volatile) — cần token; thiếu token → báo ở ô kiện, không chặn cả trang
         try:
-            ctx["packages"] = kc.ds_kien_f(khach.get("code") or code)
+            ctx["packages"] = kc.ds_kien_f(khach.get("code") or code, warehouse_id=cur_warehouse_id)
         except KhodenError as e:
             ctx["loi_kien"] = str(e)
+        ctx["tong_kien"] = len(ctx["packages"])
+        ctx["tong_can"] = round(sum(float(p.get("packageFWeight") or 0) for p in ctx["packages"]), 2)
 
     # Tỉnh + kho: đọc từ cache (cho datalist / select kho gửi)
     ctx["tinhs"] = doc.ds_tinh(session)
@@ -213,6 +225,7 @@ def submit_tao_pgh(
     address: str = Form(""),
     package_tokens: list[str] = Form([]),  # "packageFId|packageFCode"
     delivery_method_id: int = Form(2),
+    warehouse_id: int = Form(0),  # Kho đến (0 = dùng mặc định)
     note: str = Form(""),
     received_date: str = Form(""),
     is_draft: bool = Form(False),
@@ -299,6 +312,7 @@ def submit_tao_pgh(
     chung = dict(
         packages=packages,
         delivery_method_id=delivery_method_id,
+        warehouse_id=(warehouse_id or None),
         note=note.strip(),
         received_date=received_date.strip() or None,
         total_weight=_can_nang_float(ds),
