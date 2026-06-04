@@ -9,6 +9,7 @@ Gateway định tuyến theo prefix: KhoDen/..., CommonKDN/... (ASP.NET, case-in
 """
 from __future__ import annotations
 
+import time
 from typing import Any, Optional
 
 import httpx
@@ -21,6 +22,14 @@ class QuanlyError(Exception):
     pass
 
 
+# Client HTTP dùng chung (keep-alive theo host) — tránh bắt tay TLS mỗi call.
+_HTTP = httpx.Client(
+    base_url=settings.KK_QUANLY_BASE,
+    timeout=httpx.Timeout(40.0, connect=8.0),
+    limits=httpx.Limits(max_keepalive_connections=20, max_connections=40, keepalive_expiry=60.0),
+)
+
+
 def _cookies() -> dict[str, str]:
     # Token identityapi (lexuantruong) — gateway nhận qua cookie access_token
     return {"access_token": kc._lay_token()}
@@ -31,8 +40,7 @@ def _headers() -> dict[str, str]:
 
 
 def _get(path: str, params: Optional[dict] = None) -> Any:
-    with httpx.Client(base_url=settings.KK_QUANLY_BASE, timeout=40.0) as c:
-        r = c.get(path, params=params or {}, cookies=_cookies(),
+    r = _HTTP.get(path, params=params or {}, cookies=_cookies(),
                   headers={"X-Requested-With": "XMLHttpRequest"})
     if r.status_code != 200:
         raise QuanlyError(f"GET {path} {r.status_code}: {r.text[:400]}")
@@ -40,8 +48,7 @@ def _get(path: str, params: Optional[dict] = None) -> Any:
 
 
 def _post(path: str, body: dict) -> Any:
-    with httpx.Client(base_url=settings.KK_QUANLY_BASE, timeout=40.0) as c:
-        r = c.post(path, json=body, cookies=_cookies(), headers=_headers())
+    r = _HTTP.post(path, json=body, cookies=_cookies(), headers=_headers())
     if r.status_code != 200:
         raise QuanlyError(f"POST {path} {r.status_code}: {r.text[:500]}")
     return r.json()
@@ -130,9 +137,21 @@ def tim_khach(term: str, is_parent: Optional[bool] = None) -> list[dict]:
 
 # ===== Đối tác VC + báo giá VTP =====
 
+_doi_tac_cache: dict = {"value": None, "at": 0.0}
+_DOI_TAC_TTL = 1800.0  # 30 phút — DS đối tác gần như tĩnh, tránh gọi gateway mỗi lần mở form
+
+
 def ds_doi_tac() -> list[dict]:
-    """GET get-list-delivery-partner → [{id, name}] (Viettel Post id = 1002)."""
-    return _as_list(_get("/KhoDen/DeliveryOrders/api/get-list-delivery-partner"))
+    """GET get-list-delivery-partner → [{id, name}] (Viettel Post id = 1002). Cache 30'."""
+    now = time.monotonic()
+    c = _doi_tac_cache
+    if c["value"] is not None and (now - c["at"]) < _DOI_TAC_TTL:
+        return c["value"]
+    data = _as_list(_get("/KhoDen/DeliveryOrders/api/get-list-delivery-partner"))
+    if data:
+        c["value"] = data
+        c["at"] = now
+    return data
 
 
 def bao_gia_vtp(body: dict) -> list[dict]:

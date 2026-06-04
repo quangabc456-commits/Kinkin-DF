@@ -8,6 +8,7 @@ Luồng:
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from typing import Optional
 
@@ -180,32 +181,47 @@ def form_tao_pgh(
         else:
             ctx["khach_chua_co"] = True  # không có trong danh sách → báo tạo tài khoản
 
-    if khach is not None:
-        ctx["khach"] = khach
-        # Địa chỉ đã có: đọc cache trước (nhanh). Cache trống cho khách này → thử live
-        # (cache địa chỉ chưa đầy đủ); thiếu token thì bỏ qua, KHÔNG chặn trang.
-        ctx["addresses"] = doc.dia_chi_cua_khach(session, khach["id"])
-        if not ctx["addresses"]:
-            try:
-                ctx["addresses"] = kc.lay_dia_chi_cua_khach(khach["id"])
-            except KhodenError:
-                pass
-        # Kiện F: GIỮ LIVE (volatile) — cần token; thiếu token → báo ở ô kiện, không chặn cả trang
-        try:
-            ctx["packages"] = kc.ds_kien_f(khach.get("code") or code, warehouse_id=cur_warehouse_id)
-        except KhodenError as e:
-            ctx["loi_kien"] = str(e)
-        ctx["tong_kien"] = len(ctx["packages"])
-        ctx["tong_can"] = round(sum(float(p.get("packageFWeight") or 0) for p in ctx["packages"]), 2)
-
-    # Tỉnh + kho: đọc từ cache (cho datalist / select kho gửi)
+    # Danh mục đọc DB (nhanh) — luôn cần cho select Kho đến + datalist Tỉnh
     ctx["tinhs"] = doc.ds_tinh(session)
     ctx["khos"] = doc.ds_kho(session)
-    # Đối tác VTP qua gateway (1-call). Thiếu token → fallback list tĩnh để form vẫn render.
-    try:
-        ctx["doi_tac"] = qc.ds_doi_tac()
-    except (QuanlyError, KhodenError):
-        ctx["doi_tac"] = [{"id": settings.VIETTELPOST_PARTNER_ID, "name": "Viettel Post"}]
+
+    if khach is not None:
+        ctx["khach"] = khach
+        ctx["addresses"] = doc.dia_chi_cua_khach(session, khach["id"])  # cache (DB, nhanh)
+
+        # Các call LIVE độc lập chạy SONG SONG (không đụng DB session) → thời gian ~= 1 call
+        # chậm nhất thay vì tổng. Mở trang trống (chưa có khách) thì KHÔNG gọi live nào.
+        def _lay_kien():
+            return kc.ds_kien_f(khach.get("code") or code, warehouse_id=cur_warehouse_id)
+
+        def _lay_doi_tac():
+            try:
+                return qc.ds_doi_tac()
+            except (QuanlyError, KhodenError):
+                return [{"id": settings.VIETTELPOST_PARTNER_ID, "name": "Viettel Post"}]
+
+        def _lay_dia_chi_live():
+            try:
+                return kc.lay_dia_chi_cua_khach(khach["id"])
+            except KhodenError:
+                return []
+
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            fut_kien = ex.submit(_lay_kien)        # kiện F (live, volatile)
+            fut_dt = ex.submit(_lay_doi_tac)       # đối tác VTP (cache 30')
+            fut_addr = ex.submit(_lay_dia_chi_live) if not ctx["addresses"] else None
+            try:
+                ctx["packages"] = fut_kien.result()
+            except KhodenError as e:
+                ctx["loi_kien"] = str(e)
+            ctx["doi_tac"] = fut_dt.result()
+            if fut_addr is not None:
+                addr = fut_addr.result()
+                if addr:
+                    ctx["addresses"] = addr
+
+        ctx["tong_kien"] = len(ctx["packages"])
+        ctx["tong_can"] = round(sum(float(p.get("packageFWeight") or 0) for p in ctx["packages"]), 2)
 
     return templates.TemplateResponse("pgh/kho_den_form.html", ctx)
 

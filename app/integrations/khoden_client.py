@@ -24,6 +24,14 @@ CLIENT_ID = "Kinkin"
 CLIENT_SECRET = "KinkinAPP"
 SCOPE = "Identity KinkinCore KinkinReport WarehouseExport offline_access"
 
+# Client HTTP DÙNG CHUNG: giữ kết nối keep-alive theo từng host → tránh bắt tay TCP/TLS
+# lại mỗi call (mỗi lần tạo httpx.Client mới = +100–300ms). httpx pool theo host, an toàn
+# đa luồng (endpoint sync chạy trong threadpool). connect timeout ngắn để host chết fail nhanh.
+_HTTP = httpx.Client(
+    timeout=httpx.Timeout(30.0, connect=8.0),
+    limits=httpx.Limits(max_keepalive_connections=20, max_connections=40, keepalive_expiry=60.0),
+)
+
 # GUID hằng (xác nhận từ dữ liệu thật)
 NATION_VIETNAM_ID = "3e629beb-3283-4ab0-8983-28166dbbbc1b"
 NATION_VIETNAM_NAME = "VIETNAM"
@@ -62,12 +70,11 @@ def _lay_token(force_refresh: bool = False) -> str:
             "username": settings.KK_KHODEN_USERNAME.strip(),
             "password": settings.KK_KHODEN_PASSWORD.strip(),
         }
-        with httpx.Client(base_url=settings.KK_BASE_KHODEN_IDENTITY, timeout=30.0) as c:
-            r = c.post(
-                "/connect/token",
-                data=body,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+        r = _HTTP.post(
+            settings.KK_BASE_KHODEN_IDENTITY + "/connect/token",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
         if r.status_code != 200:
             raise KhodenError(f"connect/token {r.status_code}: {r.text[:300]}")
         data = r.json()
@@ -90,16 +97,14 @@ def _headers() -> dict[str, str]:
 
 
 def _post(base: str, path: str, body: dict) -> dict:
-    with httpx.Client(base_url=base, timeout=30.0) as c:
-        r = c.post(path, json=body, headers=_headers())
+    r = _HTTP.post(base + path, json=body, headers=_headers())
     if r.status_code != 200:
         raise KhodenError(f"POST {path} {r.status_code}: {r.text[:400]}")
     return r.json()
 
 
 def _get(base: str, path: str, params: dict) -> dict:
-    with httpx.Client(base_url=base, timeout=30.0) as c:
-        r = c.get(path, params=params, headers=_headers())
+    r = _HTTP.get(base + path, params=params, headers=_headers())
     if r.status_code != 200:
         raise KhodenError(f"GET {path} {r.status_code}: {r.text[:400]}")
     return r.json()
