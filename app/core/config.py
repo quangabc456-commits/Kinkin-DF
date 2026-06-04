@@ -19,8 +19,9 @@ class Settings(BaseSettings):
 
     ENABLE_SYNC_UI: bool = True
 
-    VTP_BASE_URL: str = "https://partnerdev.viettelpost.vn"
-    VTP_PRINT_BASE_URL: str = "https://dev-print.viettelpost.vn"
+    # Production VTP (tài khoản it.dept là tài khoản thật). Đổi về *dev nếu cần sandbox.
+    VTP_BASE_URL: str = "https://partner.viettelpost.vn"
+    VTP_PRINT_BASE_URL: str = "https://print.viettelpost.vn"
     # Tài khoản VTP (để seed vào bảng tai_khoan_vtp qua `python -m app.cli.seed_vtp`).
     # Secret — set trong .env, KHÔNG commit. Nơi dùng thật là bảng tai_khoan_vtp (đã mã hoá).
     VTP_SECRET_TOKEN: str = ""   # token LoginVTP (ưu tiên)
