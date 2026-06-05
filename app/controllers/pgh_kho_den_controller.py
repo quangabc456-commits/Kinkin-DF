@@ -216,6 +216,7 @@ def form_tao_pgh(
         "tinhs": [],
         "doi_tac": [],
         "khos": [],
+        "kho_thong_tin": [],  # kho KÈM SĐT + địa chỉ (tự điền giống quản lý)
         "vtp_partner_id": settings.VIETTELPOST_PARTNER_ID,
         "default_method_id": ht["method_id"],          # hình thức giao mặc định (2 hoặc 3)
         "default_partner_id": ht["partner_id"],         # đối tác mặc định (1002 nếu Viettel, else 0)
@@ -283,15 +284,23 @@ def form_tao_pgh(
             except KhodenError:
                 return []
 
-        with ThreadPoolExecutor(max_workers=3) as ex:
+        def _lay_kho_ct():
+            try:
+                return qc.ds_kho_chi_tiet()  # kho + SĐT + địa chỉ (cache 30')
+            except (QuanlyError, KhodenError):
+                return []
+
+        with ThreadPoolExecutor(max_workers=4) as ex:
             fut_kien = ex.submit(_lay_kien)        # kiện F (live, volatile)
             fut_dt = ex.submit(_lay_doi_tac)       # đối tác VTP (cache 30')
+            fut_kho = ex.submit(_lay_kho_ct)       # kho + SĐT/địa chỉ (cache 30')
             fut_addr = ex.submit(_lay_dia_chi_live) if not ctx["addresses"] else None
             try:
                 ctx["packages"] = fut_kien.result()
             except KhodenError as e:
                 ctx["loi_kien"] = str(e)
             ctx["doi_tac"] = fut_dt.result()
+            ctx["kho_thong_tin"] = fut_kho.result()
             if fut_addr is not None:
                 addr = fut_addr.result()
                 if addr:

@@ -58,7 +58,8 @@ def _as_list(d: Any) -> list[dict]:
     if isinstance(d, list):
         return d
     if isinstance(d, dict):
-        return d.get("data") or d.get("items") or []
+        # gateway dùng nhiều envelope: data / items / resources (vd KKWarehouses, DOReceiveAddress)
+        return d.get("data") or d.get("items") or d.get("resources") or []
     return []
 
 
@@ -206,3 +207,26 @@ def tao_dia_chi(body: dict) -> dict:
 def ds_kho() -> list[dict]:
     """GET CommonKDN/KKWarehouses/api/list → danh sách kho."""
     return _as_list(_get("/CommonKDN/KKWarehouses/api/list"))
+
+
+_kho_ct_cache: dict = {"value": None, "at": 0.0}
+_KHO_CT_TTL = 1800.0  # 30 phút — DS kho gần như tĩnh
+
+
+def ds_kho_chi_tiet() -> list[dict]:
+    """Kho KÈM `address` + `phone` (CommonKDN/KKWarehouses/api/list) — GIỐNG trang quản lý
+    tự điền SĐT/địa chỉ kho khi chọn kho. Item: {id, kinkinId, code, name, address, phone, ...}.
+    Cache 30'. Lỗi → trả cache cũ (hoặc rỗng) thay vì ném.
+    """
+    now = time.monotonic()
+    c = _kho_ct_cache
+    if c["value"] is not None and (now - c["at"]) < _KHO_CT_TTL:
+        return c["value"]
+    try:
+        data = _as_list(_get("/CommonKDN/KKWarehouses/api/list"))
+    except QuanlyError:
+        return c["value"] or []
+    if data:
+        c["value"] = data
+        c["at"] = now
+    return data or (c["value"] or [])

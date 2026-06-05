@@ -31,6 +31,32 @@
 module.exports = {
   apps: [
     {
+      // Web dev server (uvicorn --reload) chạy ngầm qua PM2.
+      // ⚠️ DÙNG python.exe (KHÔNG pythonw.exe) vì uvicorn --reload reloader
+      //    cần IPC stdin/stdout với subprocess server — pythonw.exe không có
+      //    handle stdio → subprocess chết im lặng, server không bao giờ lên.
+      // PM2 spawn process với `windowsHide: true` mặc định → KHÔNG có cửa sổ
+      // console nào hiện ra dù dùng python.exe. Log đẩy ra ./logs/kkdf-web.*.log.
+      // Reload giới hạn trong thư mục `app/` để tránh restart vô tận khi
+      // worker/IDE ghi file khác.
+      name: "kkdf-web",
+      script: ".venv/Scripts/python.exe",
+      args: "-m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --reload-dir app",
+      cwd: __dirname,
+      interpreter: "none",
+      autorestart: true,
+      windowsHide: true,
+      max_memory_restart: "512M",
+      env: {
+        PYTHONIOENCODING: "utf-8",
+        PYTHONUNBUFFERED: "1",
+      },
+      out_file: "./logs/kkdf-web.out.log",
+      error_file: "./logs/kkdf-web.err.log",
+      merge_logs: true,
+      time: true,
+    },
+    {
       name: "kkdf-cron",
       // pythonw.exe = Python KHÔNG cửa sổ console → tránh bật terminal mỗi 5'
       // (cron_restart spawn lại process; python.exe là console app nên nhảy cửa sổ).

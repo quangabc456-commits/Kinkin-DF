@@ -287,13 +287,17 @@
       </div>
       <div class="q-grid2" style="margin-top:.6rem; grid-template-columns:1fr 1fr;">
         <div class="q-field"><label>Kho gửi</label>
-          <select form="form-pgh" name="vtp_warehouse_name">
+          {% set kho_list = kho_thong_tin if kho_thong_tin else khos %}
+          <select form="form-pgh" id="vtp_warehouse_name" name="vtp_warehouse_name" onchange="khoden_onKhoGuiChange()">
             <option value="">— Chọn kho gửi —</option>
-            {% for k in khos %}<option value="{{ k.name }}">{{ k.name }}</option>{% endfor %}
+            {% for k in kho_list %}
+              <option value="{{ k.name }}" data-id="{{ k.id }}" data-phone="{{ k.phone or '' }}" data-address="{{ k.address or '' }}"
+                 {% if (k.id|string) == (cur_warehouse_id|string) %}selected{% endif %}>{{ k.name }}</option>
+            {% endfor %}
           </select>
         </div>
-        <div class="q-field"><label>SĐT kho gửi</label><input form="form-pgh" type="text" name="vtp_warehouse_phone"></div>
-        <div class="q-field" style="grid-column:1 / -1;"><label>Địa chỉ kho gửi (để báo giá)</label><input form="form-pgh" type="text" id="vtp_warehouse_address" name="vtp_warehouse_address" placeholder="vd Hà Đông, Hà Nội" oninput="khoden_onQuoteInput()"></div>
+        <div class="q-field"><label>SĐT kho gửi</label><input form="form-pgh" type="text" id="vtp_warehouse_phone" name="vtp_warehouse_phone"></div>
+        <div class="q-field" style="grid-column:1 / -1;"><label>Địa chỉ kho gửi (tự điền theo kho — sửa được)</label><input form="form-pgh" type="text" id="vtp_warehouse_address" name="vtp_warehouse_address" placeholder="vd Hà Đông, Hà Nội" oninput="khoden_onQuoteInput()"></div>
       </div>
     </div>
   </div>
@@ -341,6 +345,18 @@
     var n = document.querySelectorAll('.chk-f:checked').length;
     var el = document.getElementById('q-da-chon'); if (el) el.textContent = n;
     khoden_onQuoteInput();  // đổi cân kiện → báo giá lại
+  }
+
+  // Chọn kho gửi → tự điền SĐT + địa chỉ kho (giống quản lý) rồi báo giá lại
+  function khoden_onKhoGuiChange() {
+    var sel = document.getElementById('vtp_warehouse_name');
+    if (!sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    var ph = document.getElementById('vtp_warehouse_phone');
+    var ad = document.getElementById('vtp_warehouse_address');
+    if (opt && ph) ph.value = opt.getAttribute('data-phone') || '';
+    if (opt && ad) ad.value = opt.getAttribute('data-address') || '';
+    khoden_onQuoteInput();
   }
 
   // ===== Báo giá Viettel Post (giống quản lý: formatAddress 2 đầu → get-list-service) =====
@@ -417,8 +433,8 @@
   khoden_toggleAddr();
   khoden_toggleVtp();
   khoden_count();
-  // Nếu mặc định là "qua đối tác" (đơn Viettel) + đã có địa chỉ kho gửi → báo giá ngay
-  khoden_baoGiaVtp(false);
+  // Tự điền SĐT + địa chỉ kho gửi theo kho đang chọn → đơn Viettel báo giá ngay
+  khoden_onKhoGuiChange();
 
   // Typeahead tra khách: get-customer-code (mã + khách con) / list (tên) — server lo, JS chỉ gợi ý
   (function () {
