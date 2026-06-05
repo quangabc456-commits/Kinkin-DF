@@ -95,6 +95,18 @@
   ```
   Response item: `{mA_DV_CHINH (mã DV), teN_DICHVU (tên), thoI_GIAN (thời gian), giA_CUOC (giá cước)}`.
   → Gọi khi đổi dịch vụ/kích thước/giá trị và partner=VTP; điều kiện: có địa chỉ nhận + kho đến + tổng cân.
+  - ✅ **ĐÃ XÁC MINH (2026-06-05)** — `SENDER_*`/`RECEIVER_*` là **`provinceKinKinId`/`districtKinKinId` (SỐ)**,
+    KHÔNG phải GUID/tên (truyền GUID → `400 Object reference not set`; bỏ trống → `400 Nullable must have a value`).
+    Lấy số này bằng `formatAddress?input=<địa chỉ text>` → trả `provinceKinKinId`/`districtKinKinId`.
+    JS thật: `SENDER_*=warehouseInfo.provinceKinKinId` (từ `formatAddress(income-warehouse-address)`),
+    `RECEIVER_*=selectedAddress.provinceKinkinId` (từ `DOReceiveAddress/get-data`). `KhoHangId`=kinkinId kho đến.
+    `PRODUCT_WEIGHT` = tổng cân kiện F đã tích (raw, KHÔNG ×1000). → Đã wire: `quanly_client.format_address` +
+    `bao_gia_vtp`; endpoint app `GET /pgh/kho-den/api/vtp-service`.
+
+## Hình thức giao hàng (deliveryMethodId) — ✅ XÁC MINH LIVE `get-filter-method` (2026-06-05)
+`1`=Luân Chuyển · `2`=Giao hàng trực tiếp · **`3`=Giao hàng qua đối tác** · `4`=Giao hàng tại kho · `0`=Tất cả (filter).
+Đối tác `get-list-delivery-partner` → Viettel Post `id=1002`. Rule app: phương thức gửi sheet chứa "viettel"
+→ mặc định method=3 + partner=1002 (`tao_pgh_kho_den.suy_ra_hinh_thuc`); còn lại → method=2.
 
 ## Kho
 - `CommonKDN/KKWarehouses/api/list` (GET) → DS kho (có `kinkinId`).

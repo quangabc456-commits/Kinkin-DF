@@ -29,6 +29,7 @@ from app.services import kho_den_ref_doc as doc
 from app.services.tao_pgh_hop_nhat import luu_ket_qua
 from app.services.tao_pgh_kho_den import (
     KhoDenServiceError,
+    suy_ra_hinh_thuc,
     tao_pgh_dia_chi_cu,
     tao_pgh_dia_chi_moi,
 )
@@ -116,6 +117,71 @@ def api_tim_khach(q: str = "", session: Session = Depends(get_db)):
     ]
 
 
+@router.get("/api/vtp-service", response_class=JSONResponse)
+def api_vtp_service(
+    receiver: str = "",          # text địa chỉ NHẬN (tỉnh/huyện) — để lấy provinceKinKinId nhận
+    sender: str = "",            # text địa chỉ KHO GỬI — để lấy provinceKinKinId gửi
+    warehouse_id: str = "",      # id kho đến (kd_kho.id) → resolve KhoHangId (kinkinId)
+    weight: float = 0,
+    price: float = 0,
+    cod: float = 0,
+    length: float = 0,
+    width: float = 0,
+    height: float = 0,
+    session: Session = Depends(get_db),
+):
+    """Báo giá Viettel Post (GIỐNG trang quản lý): format_address(2 đầu) → get-list-service.
+
+    Trả {ok, services:[{code,name,time,price}], loi}. Lỗi/thiếu địa chỉ → ok=False + services rỗng
+    (UI tự cho nhập tay mã dịch vụ). KhoHangId = kinkinId của kho đến.
+    """
+    snd = qc.format_address(sender) if sender.strip() else {}
+    rcv = qc.format_address(receiver) if receiver.strip() else {}
+    sp, sd = snd.get("provinceKinKinId"), snd.get("districtKinKinId")
+    rp, rd = rcv.get("provinceKinKinId"), rcv.get("districtKinKinId")
+    if not (sp and sd):
+        return {"ok": False, "loi": "Chưa đủ địa chỉ KHO GỬI để báo giá.", "services": []}
+    if not (rp and rd):
+        return {"ok": False, "loi": "Chưa đủ địa chỉ NHẬN để báo giá.", "services": []}
+
+    kho_kinkin = None
+    for k in doc.ds_kho(session):
+        if str(k.get("id")) == str(warehouse_id):
+            kho_kinkin = k.get("kinkinId")
+            break
+
+    body = {
+        "PRODUCT_WEIGHT": weight or 0,
+        "PRODUCT_PRICE": price or None,
+        "MONEY_COLLECTION": cod or None,
+        "PRODUCT_LENGTH": length or None,
+        "PRODUCT_WIDTH": width or None,
+        "PRODUCT_HEIGHT": height or None,
+        "KhoHangId": kho_kinkin,
+        "SENDER_PROVINCE": int(sp), "SENDER_DISTRICT": int(sd),
+        "RECEIVER_PROVINCE": int(rp), "RECEIVER_DISTRICT": int(rd),
+    }
+    try:
+        rows = qc.bao_gia_vtp(body)
+    except (QuanlyError, KhodenError):
+        return {"ok": False, "loi": "Chưa lấy được bảng giá Viettel Post. Vui lòng thử lại.", "services": []}
+
+    seen: set[str] = set()
+    services: list[dict] = []
+    for s in rows:
+        code = s.get("mA_DV_CHINH")
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        services.append({
+            "code": code,
+            "name": s.get("teN_DICHVU"),
+            "time": s.get("thoI_GIAN"),
+            "price": s.get("giA_CUOC"),
+        })
+    return {"ok": True, "services": services}
+
+
 @router.get("/{ds_id}", response_class=HTMLResponse)
 def form_tao_pgh(
     ds_id: int,
@@ -132,6 +198,11 @@ def form_tao_pgh(
     # người nhận, không phải mã khách → tránh báo nhầm "khách chưa có" ngay khi mở trang).
     code = (customer_code or "").strip()
     cur_warehouse_id = warehouse_id or int(settings.DEFAULT_KHO_DEN_ID or 5)
+
+    # Hình thức giao MẶC ĐỊNH suy từ phương thức gửi của sheet: 'Viettel' → qua đối tác
+    # (đối tác = Viettel Post), còn lại → trực tiếp. Người dùng vẫn đổi được trên form.
+    ht = suy_ra_hinh_thuc(ds.phuong_thuc_gui)
+
     ctx = {
         "request": request,
         "ds": ds,
@@ -146,6 +217,9 @@ def form_tao_pgh(
         "doi_tac": [],
         "khos": [],
         "vtp_partner_id": settings.VIETTELPOST_PARTNER_ID,
+        "default_method_id": ht["method_id"],          # hình thức giao mặc định (2 hoặc 3)
+        "default_partner_id": ht["partner_id"],         # đối tác mặc định (1002 nếu Viettel, else 0)
+        "phuong_thuc_gui": ds.phuong_thuc_gui or "",    # hiển thị lý do mặc định
         "nguoi_tao": settings.KK_KHODEN_USERNAME or "—",
         "hom_nay": date.today().strftime("%d/%m/%Y"),
         "cur_warehouse_id": cur_warehouse_id,
@@ -268,11 +342,21 @@ def submit_tao_pgh(
         raise HTTPException(404, f"Không tìm thấy vận đơn id={ds_id}")
 
     customer_code = customer_code.strip()
+    # Token kiện F: "packageFId|packageFCode|packageFName(codeF)|weight" (4 phần, khớp body quản lý)
     packages: list[dict] = []
+    tong_can_kien = 0.0
     for tok in package_tokens:
-        fid, _, ftk = tok.partition("|")
+        parts = tok.split("|")
+        fid = parts[0] if parts else ""
+        ftk = parts[1] if len(parts) > 1 else ""
+        fcode_f = parts[2] if len(parts) > 2 else ""
+        try:
+            fw = float(parts[3]) if len(parts) > 3 and parts[3] else 0.0
+        except (ValueError, TypeError):
+            fw = 0.0
         if fid:
-            packages.append({"packageFId": fid, "codeTracking": ftk})
+            packages.append({"packageFId": fid, "codeTracking": ftk, "codeF": fcode_f})
+            tong_can_kien += fw
 
     ctx_base = {
         "request": request,
@@ -334,7 +418,9 @@ def submit_tao_pgh(
         warehouse_id=(warehouse_id or None),
         note=note.strip(),
         received_date=received_date.strip() or None,
-        total_weight=_can_nang_float(ds),
+        # Tổng cân = tổng cân các kiện F đã tích (giống quản lý: totalWeightPackageF);
+        # nếu không đọc được cân kiện thì lùi về cân của dòng sheet.
+        total_weight=round(tong_can_kien, 2) or _can_nang_float(ds),
         is_draft=is_draft,
         vtp=vtp,
     )

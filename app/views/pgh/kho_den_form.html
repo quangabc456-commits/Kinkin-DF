@@ -53,10 +53,15 @@
     <div class="q-grid3">
       <div class="q-field">
         <label>Hình thức giao hàng</label>
-        <select form="form-pgh" name="delivery_method_id">
-          <option value="2" selected>Giao hàng trực tiếp</option>
-          <option value="1">Luân chuyển</option>
+        <select form="form-pgh" name="delivery_method_id" id="delivery_method_id" onchange="khoden_onMethodChange()">
+          <option value="2" {% if default_method_id == 2 %}selected{% endif %}>Giao hàng trực tiếp</option>
+          <option value="3" {% if default_method_id == 3 %}selected{% endif %}>Giao hàng qua đối tác</option>
+          <option value="1" {% if default_method_id == 1 %}selected{% endif %}>Luân chuyển</option>
+          <option value="4" {% if default_method_id == 4 %}selected{% endif %}>Giao hàng tại kho</option>
         </select>
+        {% if phuong_thuc_gui %}
+          <span class="muted" style="font-size:11px;">Theo phương thức gửi <strong>{{ phuong_thuc_gui }}</strong>{% if default_method_id == 3 %} → mặc định giao qua Viettel Post{% endif %}.</span>
+        {% endif %}
       </div>
       <div class="q-field">
         <label>Mã khách hàng</label>
@@ -169,7 +174,9 @@
             <tbody>
               {% for a in addresses %}
                 <tr>
-                  <td class="q-check"><input form="form-pgh" type="radio" name="address_id" value="{{ a.id }}" {% if loop.first %}checked{% endif %}></td>
+                  <td class="q-check"><input form="form-pgh" class="addr-radio" type="radio" name="address_id" value="{{ a.id }}"
+                         data-province="{{ a.provinceName or '' }}" data-district="{{ a.districtName or '' }}"
+                         {% if loop.first %}checked{% endif %} onchange="khoden_onQuoteInput()"></td>
                   <td>{{ a.receiver or '—' }}</td>
                   <td class="nowrap">{{ a.phone or '—' }}</td>
                   <td>{{ a.wardName }}, {{ a.districtName }}, {{ a.provinceName }}</td>
@@ -221,7 +228,8 @@
               {% set st = f.currentPackageFStatus %}
               <tr>
                 <td class="q-check"><input form="form-pgh" class="chk-f" type="checkbox" name="package_tokens"
-                       value="{{ f.packageFId }}|{{ f.packageFCode }}" onchange="khoden_count()"></td>
+                       value="{{ f.packageFId }}|{{ f.packageFCode }}|{{ f.packageFName or '' }}|{{ f.packageFWeight or 0 }}"
+                       data-weight="{{ f.packageFWeight or 0 }}" onchange="khoden_count()"></td>
                 <td class="nowrap">{{ f.billClosedDate[:10] if f.billClosedDate else '—' }}</td>
                 <td class="nowrap">{{ f.mawb or '—' }}</td>
                 <td class="nowrap">{{ f.billDate[:10] if f.billDate else '—' }}</td>
@@ -249,21 +257,33 @@
     <div class="q-field" style="max-width:340px; margin-bottom:.6rem;">
       <label>Đối tác vận chuyển</label>
       <select form="form-pgh" id="delivery_partner_id" name="delivery_partner_id" onchange="khoden_toggleVtp()">
-        <option value="0">— Không dùng (chỉ tạo PGH kho đến) —</option>
-        {% for d in doi_tac %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+        <option value="0" {% if not default_partner_id %}selected{% endif %}>— Không dùng (chỉ tạo PGH kho đến) —</option>
+        {% for d in doi_tac %}<option value="{{ d.id }}" {% if d.id == default_partner_id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
       </select>
       <span class="muted" style="font-size:11px;">Chọn <strong>Viettel Post</strong> để tạo đồng thời đơn Viettel Post.</span>
     </div>
     <div id="vtp-fields" style="display:none;">
       <div class="q-grid3">
-        <div class="q-field"><label>Mã dịch vụ VTP</label><input form="form-pgh" type="text" name="vtp_service" placeholder="vd VCN / VHT"></div>
+        <div class="q-field" style="grid-column:span 2;">
+          <label>Dịch vụ Viettel Post</label>
+          <div style="display:flex; gap:.4rem;">
+            <select form="form-pgh" id="vtp_service" name="vtp_service" style="flex:1;">
+              <option value="">— Bấm “Báo giá” để lấy dịch vụ + cước —</option>
+              <option value="VCN">VCN — Chuyển phát nhanh</option>
+              <option value="VHT">VHT — Hỏa tốc</option>
+              <option value="PHS">PHS — Tiết kiệm (nội tỉnh)</option>
+            </select>
+            <button type="button" class="btn blue sm" onclick="khoden_baoGiaVtp(true)">Báo giá</button>
+          </div>
+          <span class="muted" id="vtp-quote-note" style="font-size:11px;">Chọn địa chỉ nhận + nhập địa chỉ kho gửi để lấy bảng giá tự động.</span>
+        </div>
         <div class="q-field"><label>Người trả cước</label><input form="form-pgh" type="number" name="vtp_payment" value="1" min="1"></div>
-        <div class="q-field"><label>COD (VND)</label><input form="form-pgh" type="text" name="vtp_cod" value="0"></div>
-        <div class="q-field"><label>Giá trị hàng (VND)</label><input form="form-pgh" type="text" name="vtp_price" value="0"></div>
+        <div class="q-field"><label>COD (VND)</label><input form="form-pgh" type="text" name="vtp_cod" value="0" oninput="khoden_onQuoteInput()"></div>
+        <div class="q-field"><label>Giá trị hàng (VND)</label><input form="form-pgh" type="text" name="vtp_price" value="0" oninput="khoden_onQuoteInput()"></div>
         <div class="q-field" style="grid-column:span 2;"><label>Tên đơn hàng (VTP)</label><input form="form-pgh" type="text" name="vtp_product_name" value="{{ ds.nhom_san_pham or '' }}"></div>
-        <div class="q-field"><label>Dài (cm)</label><input form="form-pgh" type="number" name="vtp_length" value="0" min="0"></div>
-        <div class="q-field"><label>Rộng (cm)</label><input form="form-pgh" type="number" name="vtp_width" value="0" min="0"></div>
-        <div class="q-field"><label>Cao (cm)</label><input form="form-pgh" type="number" name="vtp_height" value="0" min="0"></div>
+        <div class="q-field"><label>Dài (cm)</label><input form="form-pgh" type="number" name="vtp_length" value="0" min="0" oninput="khoden_onQuoteInput()"></div>
+        <div class="q-field"><label>Rộng (cm)</label><input form="form-pgh" type="number" name="vtp_width" value="0" min="0" oninput="khoden_onQuoteInput()"></div>
+        <div class="q-field"><label>Cao (cm)</label><input form="form-pgh" type="number" name="vtp_height" value="0" min="0" oninput="khoden_onQuoteInput()"></div>
       </div>
       <div class="q-grid2" style="margin-top:.6rem; grid-template-columns:1fr 1fr;">
         <div class="q-field"><label>Kho gửi</label>
@@ -273,7 +293,7 @@
           </select>
         </div>
         <div class="q-field"><label>SĐT kho gửi</label><input form="form-pgh" type="text" name="vtp_warehouse_phone"></div>
-        <div class="q-field" style="grid-column:1 / -1;"><label>Địa chỉ kho gửi</label><input form="form-pgh" type="text" name="vtp_warehouse_address"></div>
+        <div class="q-field" style="grid-column:1 / -1;"><label>Địa chỉ kho gửi (để báo giá)</label><input form="form-pgh" type="text" id="vtp_warehouse_address" name="vtp_warehouse_address" placeholder="vd Hà Đông, Hà Nội" oninput="khoden_onQuoteInput()"></div>
       </div>
     </div>
   </div>
@@ -291,6 +311,7 @@
 
 <script>
   var VTP_PARTNER_ID = {{ vtp_partner_id|default(1002) }};
+  var KHO_DEN_ID = '{{ cur_warehouse_id }}';
 
   function khoden_toggleAddr() {
     var r = document.querySelector('input[name="che_do_dia_chi"]:checked');
@@ -305,9 +326,80 @@
     if (!sel || !box) return;
     box.style.display = (parseInt(sel.value || '0', 10) === VTP_PARTNER_ID) ? '' : 'none';
   }
+  // Đổi hình thức giao: chọn "Giao hàng qua đối tác" (3) → tự gán đối tác Viettel Post +
+  // bung khối Viettel Post; chọn hình thức khác → bỏ đối tác.
+  function khoden_onMethodChange() {
+    var m = document.getElementById('delivery_method_id');
+    var sel = document.getElementById('delivery_partner_id');
+    if (m && sel) {
+      sel.value = (parseInt(m.value || '0', 10) === 3) ? String(VTP_PARTNER_ID) : '0';
+    }
+    khoden_toggleVtp();
+    khoden_onQuoteInput();  // chuyển sang qua đối tác → thử báo giá luôn
+  }
   function khoden_count() {
     var n = document.querySelectorAll('.chk-f:checked').length;
     var el = document.getElementById('q-da-chon'); if (el) el.textContent = n;
+    khoden_onQuoteInput();  // đổi cân kiện → báo giá lại
+  }
+
+  // ===== Báo giá Viettel Post (giống quản lý: formatAddress 2 đầu → get-list-service) =====
+  var _vtpTimer = null;
+  function khoden_onQuoteInput() {
+    clearTimeout(_vtpTimer);
+    _vtpTimer = setTimeout(function () { khoden_baoGiaVtp(false); }, 450);
+  }
+  function _vtpReceiver() {
+    var r = document.querySelector('.addr-radio:checked');
+    if (!r) return '';
+    var p = r.getAttribute('data-province') || '', d = r.getAttribute('data-district') || '';
+    return (d + ', ' + p).replace(/^[,\s]+|[,\s]+$/g, '').trim();
+  }
+  function _vtpWeight() {
+    var t = 0;
+    document.querySelectorAll('.chk-f:checked').forEach(function (c) {
+      t += parseFloat(c.getAttribute('data-weight') || '0') || 0;
+    });
+    return t;
+  }
+  function _vtpNum(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    return el ? (parseFloat(String(el.value || '0').replace(/[,\s]/g, '')) || 0) : 0;
+  }
+  function khoden_baoGiaVtp(manual) {
+    var partner = document.getElementById('delivery_partner_id');
+    var note = document.getElementById('vtp-quote-note');
+    var sel = document.getElementById('vtp_service');
+    if (!partner || !sel || parseInt(partner.value || '0', 10) !== VTP_PARTNER_ID) return;
+    var receiver = _vtpReceiver();
+    var senderEl = document.getElementById('vtp_warehouse_address');
+    var sender = senderEl ? (senderEl.value || '') : '';
+    if (!receiver || !sender.trim()) {
+      if (manual && note) note.textContent = 'Cần chọn địa chỉ nhận và nhập địa chỉ kho gửi để báo giá.';
+      return;
+    }
+    var qs = new URLSearchParams({
+      receiver: receiver, sender: sender, warehouse_id: KHO_DEN_ID,
+      weight: _vtpWeight(), price: _vtpNum('vtp_price'), cod: _vtpNum('vtp_cod'),
+      length: _vtpNum('vtp_length'), width: _vtpNum('vtp_width'), height: _vtpNum('vtp_height')
+    });
+    if (note) note.textContent = 'Đang lấy bảng giá…';
+    fetch('/pgh/kho-den/api/vtp-service?' + qs.toString())
+      .then(function (r) { return r.ok ? r.json() : { ok: false, services: [] }; })
+      .then(function (res) {
+        if (!res.ok || !res.services || !res.services.length) {
+          if (note) note.textContent = res.loi || 'Chưa có dịch vụ phù hợp — có thể chọn mã dịch vụ thủ công.';
+          return;
+        }
+        var cur = sel.value;
+        sel.innerHTML = '<option value="">— Chọn dịch vụ —</option>' + res.services.map(function (s) {
+          var price = (s.price != null) ? Number(s.price).toLocaleString('vi-VN') + ' đ' : '';
+          return '<option value="' + s.code + '">' + s.code + ' — ' + (s.name || '') + (price ? ' · ' + price : '') + '</option>';
+        }).join('');
+        if (cur && res.services.some(function (s) { return s.code === cur; })) sel.value = cur;
+        if (note) note.textContent = 'Đã lấy ' + res.services.length + ' dịch vụ (cước theo cân đang chọn).';
+      })
+      .catch(function () { if (note) note.textContent = 'Không lấy được bảng giá, thử lại sau.'; });
   }
   function khoden_checkAll(master) {
     document.querySelectorAll('.chk-f').forEach(function (c) { c.checked = master.checked; });
@@ -325,6 +417,8 @@
   khoden_toggleAddr();
   khoden_toggleVtp();
   khoden_count();
+  // Nếu mặc định là "qua đối tác" (đơn Viettel) + đã có địa chỉ kho gửi → báo giá ngay
+  khoden_baoGiaVtp(false);
 
   // Typeahead tra khách: get-customer-code (mã + khách con) / list (tên) — server lo, JS chỉ gợi ý
   (function () {

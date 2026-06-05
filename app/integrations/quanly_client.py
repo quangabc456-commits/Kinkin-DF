@@ -154,12 +154,27 @@ def ds_doi_tac() -> list[dict]:
     return data
 
 
+def format_address(text: str) -> dict:
+    """GET formatAddress?input= → tách địa chỉ tự do thành tỉnh/huyện + **ID KinKin số**.
+
+    Trả (đã xác minh hệ thật): {provincesId(GUID), districtId(GUID), provincesName,
+    districtName, provinceKinKinId(số), districtKinKinId(số), address}. provinceKinKinId/
+    districtKinKinId chính là field SENDER_*/RECEIVER_* mà get-list-service cần.
+    """
+    if not (text or "").strip():
+        return {}
+    r = _get("/KhoDen/deliveryorders/api/formatAddress", {"input": text})
+    return r if isinstance(r, dict) else {}
+
+
 def bao_gia_vtp(body: dict) -> list[dict]:
     """POST get-list-service → danh sách dịch vụ VTP + giá cước.
 
     body: {PRODUCT_WEIGHT, PRODUCT_PRICE, MONEY_COLLECTION, PRODUCT_LENGTH/WIDTH/HEIGHT,
            KhoHangId, SENDER_PROVINCE/DISTRICT, RECEIVER_PROVINCE/DISTRICT}.
-    Item: {mA_DV_CHINH, teN_DICHVU, thoI_GIAN, giA_CUOC}.
+    SENDER_*/RECEIVER_* = provinceKinKinId/districtKinKinId (SỐ) từ format_address — KHÔNG phải
+    GUID/tên (truyền GUID → backend 400 'Object reference not set'). Item trả về:
+    {mA_DV_CHINH (mã DV), teN_DICHVU (tên), thoI_GIAN (thời gian), giA_CUOC (giá cước)}.
     """
     return _as_list(_post("/KhoDen/deliveryOrders/api/get-list-service", body))
 

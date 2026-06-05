@@ -19,6 +19,28 @@ class KhoDenServiceError(Exception):
     pass
 
 
+# Hình thức giao hàng — ID xác minh LIVE qua gateway get-filter-method (2026-06-05):
+#   1 = Luân chuyển · 2 = Giao hàng trực tiếp · 3 = Giao hàng qua đối tác · 4 = Giao hàng tại kho
+HINH_THUC_TRUC_TIEP = 2
+HINH_THUC_QUA_DOI_TAC = 3
+
+
+def suy_ra_hinh_thuc(phuong_thuc_gui: Optional[str]) -> dict[str, Any]:
+    """Suy ra hình thức giao MẶC ĐỊNH từ 'phương thức gửi' của sheet.
+
+    Rule: phương thức chứa 'viettel' (bỏ dấu) → GIAO QUA ĐỐI TÁC (đối tác = Viettel Post);
+    mọi phương thức khác → GIAO TRỰC TIẾP. Trả {method_id, is_partner, partner_id}.
+    """
+    pt = kc.chuan_hoa(phuong_thuc_gui)  # bỏ dấu + UPPER + gộp khoảng trắng
+    if "VIETTEL" in pt:
+        return {
+            "method_id": HINH_THUC_QUA_DOI_TAC,
+            "is_partner": True,
+            "partner_id": settings.VIETTELPOST_PARTNER_ID,
+        }
+    return {"method_id": HINH_THUC_TRUC_TIEP, "is_partner": False, "partner_id": 0}
+
+
 def resolve_dia_danh(
     ten_tinh: str,
     ten_huyen: str,
@@ -155,6 +177,7 @@ def build_body_pgh(
         "customerName": khach.get("name"),
         "customerPhone": khach.get("phone"),
         "customerId": khach.get("id"),
+        "customerKinKinId": khach.get("kinkinId"),  # giống quản lý (null nếu chưa có)
         "addressId": address_id,
         "addressDetail": None,
         "paymentMethod": None,
@@ -177,6 +200,7 @@ def build_body_pgh(
         order_info.update(_vtp_partner_fields(vtp))
 
     return {
+        "isAddOrder": False,   # khớp body trang quản lý (tạo mới, không phải thêm vào đơn có sẵn)
         "isDraft": is_draft,
         "isCreate": True,
         "isRotation": False,
@@ -185,8 +209,9 @@ def build_body_pgh(
         "packageDeliveryDtos": [
             {
                 "codeTracking": p.get("codeTracking"),
-                "orderDetailId": None,
+                "orderDetailId": p.get("orderDetailId"),
                 "packageFId": p.get("packageFId"),
+                "codeF": p.get("codeF"),  # mã F — quản lý gửi kèm trong dto
             }
             for p in packages
         ],
