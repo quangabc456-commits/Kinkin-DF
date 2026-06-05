@@ -417,7 +417,9 @@ def ds_kien_f_kha_dung(customer_code: str) -> list[dict]:
                 "packageFStatusName": f.get("statusName") or f.get("packageFStatusName"),
                 "currentPackageFStatus": f.get("currentPackageFStatus"),
                 "orderDetailId": f.get("orderDetailId"),
-                "departureWarehouseName": f.get("departureWarehouseName"),
+                "departureWarehouseName": f.get("departureWarehouseName"),  # cột "Kho đi"
+                # cột "DS phụ thu": list {name, quantity} — hiện [SL] tên như quản lý
+                "productSpecialInformation": f.get("productSpecialInformation") or [],
             }
         )
     return out

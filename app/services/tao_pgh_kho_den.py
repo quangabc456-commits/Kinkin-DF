@@ -149,6 +149,7 @@ def build_body_pgh(
     customer_type: int = 2,
     note: str = "",
     received_date: Optional[str] = None,
+    received_date_detail: str = "",   # "Thời gian mong muốn" (receivedDateTimeDetail)
     total_weight: float = 0,
     warehouse_id: Optional[int] = None,
     is_draft: bool = True,
@@ -184,7 +185,7 @@ def build_body_pgh(
         "paymentMethodId": pay,
         "note": note,
         "receivedDateTime": received_date,
-        "receivedDateTimeDetail": "",
+        "receivedDateTimeDetail": received_date_detail or "",
         "warehousRearrives": None,
         "warehousRearrivesId": None,
         "createDate": None,

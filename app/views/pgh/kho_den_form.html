@@ -27,6 +27,9 @@
   .q-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:1rem; }
   .q-tbl thead th { background:#eef0f4; }
   .q-check { width:34px; text-align:center; }
+  /* Hàng lọc nhanh dưới tiêu đề bảng kiện F (giống quản lý) */
+  tr.q-filter th { background:#f6f7f9; padding:3px 4px; }
+  tr.q-filter input, tr.q-filter select { width:100%; min-width:60px; font-size:11px; padding:2px 4px; height:auto; }
 </style>
 
 <div class="q-top">
@@ -81,7 +84,7 @@
       </div>
     </div>
 
-    <div class="q-grid2" style="margin-top:.75rem;">
+    <div class="q-grid3" style="margin-top:.75rem;">
       <div class="q-field">
         <label>Kho đến</label>
         <select form="form-search" name="warehouse_id" onchange="this.form.submit()">
@@ -93,6 +96,10 @@
       <div class="q-field">
         <label>Ngày khách cần nhận hàng</label>
         <input form="form-pgh" type="datetime-local" name="received_date">
+      </div>
+      <div class="q-field">
+        <label>Thời gian mong muốn</label>
+        <input form="form-pgh" type="text" name="received_date_detail" placeholder="vd 8h–12h, gọi trước khi giao…">
       </div>
     </div>
 
@@ -152,57 +159,66 @@
   <input form="form-pgh" type="hidden" name="customer_code" value="{{ khach.code }}">
   <input form="form-pgh" type="hidden" name="warehouse_id" value="{{ cur_warehouse_id }}">
 
-  <!-- ====== ĐỊA CHỈ GIAO HÀNG ====== -->
+  <!-- ====== ĐỊA CHỈ GIAO HÀNG (ô tóm tắt + Chỉnh sửa, giống quản lý) ====== -->
   <div class="card" style="margin-top:1rem;">
     <div class="card-title">📍 Địa chỉ giao hàng</div>
-    <div class="row" style="gap:1.2rem; margin-bottom:.7rem;">
-      <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer; color:var(--kk-ink); font-size:13.5px; font-weight:500;">
-        <input form="form-pgh" type="radio" name="che_do_dia_chi" value="cu" checked onchange="khoden_toggleAddr()"> Địa chỉ đã có
-      </label>
-      <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer; color:var(--kk-ink); font-size:13.5px; font-weight:500;">
-        <input form="form-pgh" type="radio" name="che_do_dia_chi" value="moi" onchange="khoden_toggleAddr()"> Tạo địa chỉ mới
-      </label>
+    <div style="display:flex; gap:.5rem; align-items:center; margin-bottom:.6rem;">
+      <input type="text" id="addr-summary" readonly placeholder="Chưa chọn địa chỉ — bấm “Chỉnh sửa” để chọn"
+             style="flex:1; background:var(--kk-line-soft);">
+      <button type="button" class="btn blue sm" onclick="khoden_toggleAddrChooser()">Chỉnh sửa</button>
     </div>
 
-    <div id="addr-cu">
-      {% if loi_dia_chi %}
-        <div class="badge err dot">{{ loi_dia_chi }}</div>
-      {% elif addresses %}
-        <div class="table-wrap" style="max-height:260px;">
-          <table>
-            <thead><tr><th class="q-check"></th><th>Người nhận</th><th>SĐT</th><th>Khu vực</th><th>Địa chỉ</th></tr></thead>
-            <tbody>
-              {% for a in addresses %}
-                <tr>
-                  <td class="q-check"><input form="form-pgh" class="addr-radio" type="radio" name="address_id" value="{{ a.id }}"
-                         data-province="{{ a.provinceName or '' }}" data-district="{{ a.districtName or '' }}"
-                         {% if loop.first %}checked{% endif %} onchange="khoden_onQuoteInput()"></td>
-                  <td>{{ a.receiver or '—' }}</td>
-                  <td class="nowrap">{{ a.phone or '—' }}</td>
-                  <td>{{ a.wardName }}, {{ a.districtName }}, {{ a.provinceName }}</td>
-                  <td><div class="addr">{{ a.address or '—' }}</div></td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="badge warn dot">Khách chưa có địa chỉ nào — hãy chọn "Tạo địa chỉ mới".</div>
-      {% endif %}
-    </div>
+    <div id="addr-chooser" style="display:none;">
+      <div class="row" style="gap:1.2rem; margin-bottom:.7rem;">
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer; color:var(--kk-ink); font-size:13.5px; font-weight:500;">
+          <input form="form-pgh" type="radio" name="che_do_dia_chi" value="cu" checked onchange="khoden_onAddrModeChange()"> Địa chỉ đã có
+        </label>
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer; color:var(--kk-ink); font-size:13.5px; font-weight:500;">
+          <input form="form-pgh" type="radio" name="che_do_dia_chi" value="moi" onchange="khoden_onAddrModeChange()"> Tạo địa chỉ mới
+        </label>
+      </div>
 
-    <div id="addr-moi" style="display:none;">
-      <div class="muted" style="margin-bottom:.6rem;">Nhập Tỉnh / Quận-Huyện / Phường-Xã đúng như ở kho đến (tự khớp, không phân biệt dấu/hoa-thường).</div>
-      <div class="q-grid3">
-        <div class="q-field"><label>Tên người nhận</label><input form="form-pgh" type="text" name="receiver" value="{{ ds.ten_kh or '' }}"></div>
-        <div class="q-field"><label>SĐT người nhận</label><input form="form-pgh" type="text" name="receive_phone" value="{{ ds.sdt_nguoi_nhan or '' }}"></div>
-        <div class="q-field"><label>Tỉnh / Thành phố</label>
-          <input form="form-pgh" type="text" name="ten_tinh" list="dl-tinh" placeholder="vd Hà Nội">
-          <datalist id="dl-tinh">{% for t in tinhs %}<option value="{{ t.name }}">{% endfor %}</datalist>
+      <div id="addr-cu">
+        {% if loi_dia_chi %}
+          <div class="badge err dot">{{ loi_dia_chi }}</div>
+        {% elif addresses %}
+          <div class="table-wrap" style="max-height:260px;">
+            <table>
+              <thead><tr><th class="q-check"></th><th>Người nhận</th><th>SĐT</th><th>Khu vực</th><th>Địa chỉ</th></tr></thead>
+              <tbody>
+                {% for a in addresses %}
+                  <tr>
+                    <td class="q-check"><input form="form-pgh" class="addr-radio" type="radio" name="address_id" value="{{ a.id }}"
+                           data-province="{{ a.provinceName or '' }}" data-district="{{ a.districtName or '' }}"
+                           data-summary="{{ a.receiver or '' }} · {{ a.phone or '' }} — {{ a.address or '' }} ({{ a.wardName }}, {{ a.districtName }}, {{ a.provinceName }})"
+                           {% if loop.first %}checked{% endif %} onchange="khoden_onAddrPick(this)"></td>
+                    <td>{{ a.receiver or '—' }}</td>
+                    <td class="nowrap">{{ a.phone or '—' }}</td>
+                    <td>{{ a.wardName }}, {{ a.districtName }}, {{ a.provinceName }}</td>
+                    <td><div class="addr">{{ a.address or '—' }}</div></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="badge warn dot">Khách chưa có địa chỉ nào — hãy chọn "Tạo địa chỉ mới".</div>
+        {% endif %}
+      </div>
+
+      <div id="addr-moi" style="display:none;">
+        <div class="muted" style="margin-bottom:.6rem;">Nhập Tỉnh / Quận-Huyện / Phường-Xã đúng như ở kho đến (tự khớp, không phân biệt dấu/hoa-thường).</div>
+        <div class="q-grid3">
+          <div class="q-field"><label>Tên người nhận</label><input form="form-pgh" type="text" name="receiver" value="{{ ds.ten_kh or '' }}"></div>
+          <div class="q-field"><label>SĐT người nhận</label><input form="form-pgh" type="text" name="receive_phone" value="{{ ds.sdt_nguoi_nhan or '' }}"></div>
+          <div class="q-field"><label>Tỉnh / Thành phố</label>
+            <input form="form-pgh" type="text" name="ten_tinh" list="dl-tinh" placeholder="vd Hà Nội" oninput="khoden_onQuoteInput()">
+            <datalist id="dl-tinh">{% for t in tinhs %}<option value="{{ t.name }}">{% endfor %}</datalist>
+          </div>
+          <div class="q-field"><label>Quận / Huyện</label><input form="form-pgh" type="text" name="ten_huyen" placeholder="vd Quận Hà Đông" oninput="khoden_onQuoteInput()"></div>
+          <div class="q-field"><label>Phường / Xã</label><input form="form-pgh" type="text" name="ten_xa" placeholder="vd Kiến Hưng"></div>
+          <div class="q-field"><label>Địa chỉ chi tiết</label><input form="form-pgh" type="text" name="address" value="{{ ds.dia_chi_nguoi_nhan or '' }}" placeholder="Số nhà, đường..."></div>
         </div>
-        <div class="q-field"><label>Quận / Huyện</label><input form="form-pgh" type="text" name="ten_huyen" placeholder="vd Quận Hà Đông"></div>
-        <div class="q-field"><label>Phường / Xã</label><input form="form-pgh" type="text" name="ten_xa" placeholder="vd Kiến Hưng"></div>
-        <div class="q-field"><label>Địa chỉ chi tiết</label><input form="form-pgh" type="text" name="address" value="{{ ds.dia_chi_nguoi_nhan or '' }}" placeholder="Số nhà, đường..."></div>
       </div>
     </div>
   </div>
@@ -220,13 +236,31 @@
             <tr>
               <th class="q-check"><input type="checkbox" id="chk-all" onclick="khoden_checkAll(this)"></th>
               <th>Ngày chốt</th><th>Mã Mawb</th><th>Ngày bay</th><th>Mã KH</th>
-              <th>Mã F</th><th>Mã kiện K</th><th>Mã Tracking</th><th class="nowrap">Cân (kg)</th><th>Trạng thái</th>
+              <th>Mã F</th><th>Mã kiện K</th><th>Mã Tracking</th><th>Kho đi</th><th class="nowrap">Cân (kg)</th><th>Trạng thái</th><th>DS phụ thu</th>
+            </tr>
+            <tr class="q-filter">
+              <th><select id="fl-checked" onchange="khoden_filterF()"><option value="0">Tất cả</option><option value="1">Chưa chọn</option><option value="2">Đã chọn</option></select></th>
+              <th><input type="text" id="fl-ngaychot" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th><input type="text" id="fl-mawb" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th><input type="text" id="fl-ngaybay" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th><input type="text" id="fl-makh" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th><input type="text" id="fl-maf" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th><input type="text" id="fl-mak" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th><input type="text" id="fl-tracking" oninput="khoden_filterF()" placeholder="lọc"></th>
+              <th></th><th></th><th></th><th></th>
             </tr>
           </thead>
           <tbody>
             {% for f in packages %}
               {% set st = f.currentPackageFStatus %}
-              <tr>
+              <tr class="f-row"
+                  data-ngaychot="{{ f.billClosedDate[:10] if f.billClosedDate else '' }}"
+                  data-mawb="{{ f.mawb or '' }}"
+                  data-ngaybay="{{ f.billDate[:10] if f.billDate else '' }}"
+                  data-makh="{{ f.customerCode or '' }}"
+                  data-maf="{{ f.packageFName or '' }}"
+                  data-mak="{{ f.packageKCode or '' }}"
+                  data-tracking="{{ f.packageFCode or '' }}">
                 <td class="q-check"><input form="form-pgh" class="chk-f" type="checkbox" name="package_tokens"
                        value="{{ f.packageFId }}|{{ f.packageFCode }}|{{ f.packageFName or '' }}|{{ f.packageFWeight or 0 }}"
                        data-weight="{{ f.packageFWeight or 0 }}" onchange="khoden_count()"></td>
@@ -237,14 +271,16 @@
                 <td class="nowrap"><code>{{ f.packageFName or '—' }}</code></td>
                 <td class="nowrap">{{ f.packageKCode or '—' }}</td>
                 <td class="nowrap"><code>{{ f.packageFCode or '—' }}</code></td>
+                <td class="nowrap">{{ f.departureWarehouseName or '—' }}</td>
                 <td class="nowrap">{{ f.packageFWeight if f.packageFWeight is not none else '—' }}</td>
                 <td class="nowrap"><span class="badge {% if st in [10, 8] %}neutral{% else %}ok{% endif %} dot">{{ f.packageFStatusName or st }}</span></td>
+                <td class="nowrap">{% if f.productSpecialInformation %}{% set sp = f.productSpecialInformation[0] %}[{{ sp.quantity }}] {{ sp.name }}{% else %}—{% endif %}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      <div class="muted" style="margin-top:.4rem;">Đã chọn <strong id="q-da-chon">0</strong> / {{ packages|length }} kiện.</div>
+      <div class="muted" style="margin-top:.4rem;">Đã chọn <strong id="q-da-chon">0</strong> · Hiển thị <strong id="q-hien-thi">{{ packages|length }}</strong> / {{ packages|length }} kiện.</div>
     {% else %}
       <div class="badge warn dot">Khách này không còn kiện F nào chưa lên phiếu (tất cả đã tạo phiếu giao hàng).</div>
     {% endif %}
@@ -277,7 +313,11 @@
           </div>
           <span class="muted" id="vtp-quote-note" style="font-size:11px;">Chọn địa chỉ nhận + nhập địa chỉ kho gửi để lấy bảng giá tự động.</span>
         </div>
-        <div class="q-field"><label>Người trả cước</label><input form="form-pgh" type="number" name="vtp_payment" value="1" min="1"></div>
+        <div class="q-field"><label>Loại vận đơn (VTP)</label>
+          <select form="form-pgh" name="vtp_payment">
+            <option value="1" selected>Không thu hộ</option>
+          </select>
+        </div>
         <div class="q-field"><label>COD (VND)</label><input form="form-pgh" type="text" name="vtp_cod" value="0" oninput="khoden_onQuoteInput()"></div>
         <div class="q-field"><label>Giá trị hàng (VND)</label><input form="form-pgh" type="text" name="vtp_price" value="0" oninput="khoden_onQuoteInput()"></div>
         <div class="q-field" style="grid-column:span 2;"><label>Tên đơn hàng (VTP)</label><input form="form-pgh" type="text" name="vtp_product_name" value="{{ ds.nhom_san_pham or '' }}"></div>
@@ -324,6 +364,30 @@
     if (cu) cu.style.display = moi ? 'none' : '';
     if (nw) nw.style.display = moi ? '' : 'none';
   }
+  function khoden_toggleAddrChooser() {
+    var ch = document.getElementById('addr-chooser');
+    if (ch) ch.style.display = (ch.style.display === 'none') ? '' : 'none';
+  }
+  function khoden_onAddrPick(radio) {
+    var s = document.getElementById('addr-summary');
+    if (s && radio) s.value = radio.getAttribute('data-summary') || '';
+    var ch = document.getElementById('addr-chooser'); if (ch) ch.style.display = 'none';  // chọn xong thu gọn
+    khoden_onQuoteInput();
+  }
+  function khoden_onAddrModeChange() {
+    khoden_toggleAddr();
+    var r = document.querySelector('input[name="che_do_dia_chi"]:checked');
+    var s = document.getElementById('addr-summary');
+    if (r && r.value === 'moi') { if (s) s.value = 'Địa chỉ mới (đang nhập)'; }
+    else { var picked = document.querySelector('.addr-radio:checked'); if (s && picked) s.value = picked.getAttribute('data-summary') || ''; }
+    khoden_onQuoteInput();
+  }
+  function khoden_initAddr() {
+    var picked = document.querySelector('.addr-radio:checked');
+    var s = document.getElementById('addr-summary'), ch = document.getElementById('addr-chooser');
+    if (picked) { if (s) s.value = picked.getAttribute('data-summary') || ''; if (ch) ch.style.display = 'none'; }
+    else if (ch) { ch.style.display = ''; }  // chưa có địa chỉ → mở sẵn để chọn/tạo
+  }
   function khoden_toggleVtp() {
     var sel = document.getElementById('delivery_partner_id');
     var box = document.getElementById('vtp-fields');
@@ -344,6 +408,7 @@
   function khoden_count() {
     var n = document.querySelectorAll('.chk-f:checked').length;
     var el = document.getElementById('q-da-chon'); if (el) el.textContent = n;
+    khoden_filterF();       // cập nhật lọc theo trạng thái chọn
     khoden_onQuoteInput();  // đổi cân kiện → báo giá lại
   }
 
@@ -366,6 +431,12 @@
     _vtpTimer = setTimeout(function () { khoden_baoGiaVtp(false); }, 450);
   }
   function _vtpReceiver() {
+    var mode = document.querySelector('input[name="che_do_dia_chi"]:checked');
+    if (mode && mode.value === 'moi') {
+      var h = (document.querySelector('[name="ten_huyen"]') || {}).value || '';
+      var p2 = (document.querySelector('[name="ten_tinh"]') || {}).value || '';
+      return (h + ', ' + p2).replace(/^[,\s]+|[,\s]+$/g, '').trim();
+    }
     var r = document.querySelector('.addr-radio:checked');
     if (!r) return '';
     var p = r.getAttribute('data-province') || '', d = r.getAttribute('data-district') || '';
@@ -418,8 +489,31 @@
       .catch(function () { if (note) note.textContent = 'Không lấy được bảng giá, thử lại sau.'; });
   }
   function khoden_checkAll(master) {
-    document.querySelectorAll('.chk-f').forEach(function (c) { c.checked = master.checked; });
+    // chỉ tích các dòng đang HIỆN (sau khi lọc) — giống quản lý
+    document.querySelectorAll('tr.f-row').forEach(function (row) {
+      if (row.style.display === 'none') return;
+      var c = row.querySelector('.chk-f'); if (c) c.checked = master.checked;
+    });
     khoden_count();
+  }
+  // Lọc nhanh bảng kiện F (client-side, giống hàng lọc của quản lý)
+  function khoden_filterF() {
+    var fck = (document.getElementById('fl-checked') || {}).value || '0';
+    function v(id) { var e = document.getElementById(id); return e ? e.value.trim().toLowerCase() : ''; }
+    var f = { ngaychot: v('fl-ngaychot'), mawb: v('fl-mawb'), ngaybay: v('fl-ngaybay'),
+              makh: v('fl-makh'), maf: v('fl-maf'), mak: v('fl-mak'), tracking: v('fl-tracking') };
+    var shown = 0;
+    document.querySelectorAll('tr.f-row').forEach(function (row) {
+      var cb = row.querySelector('.chk-f');
+      var checked = cb && cb.checked;
+      var okCk = (fck === '0') || (fck === '1' && !checked) || (fck === '2' && checked);
+      function has(attr, q) { return !q || (row.getAttribute('data-' + attr) || '').toLowerCase().indexOf(q) >= 0; }
+      var ok = okCk && has('ngaychot', f.ngaychot) && has('mawb', f.mawb) && has('ngaybay', f.ngaybay)
+            && has('makh', f.makh) && has('maf', f.maf) && has('mak', f.mak) && has('tracking', f.tracking);
+      row.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    var c = document.getElementById('q-hien-thi'); if (c) c.textContent = shown;
   }
   function khoden_submit(form) {
     if (document.querySelectorAll('.chk-f:checked').length === 0) {
@@ -431,6 +525,7 @@
   }
 
   khoden_toggleAddr();
+  khoden_initAddr();      // ô tóm tắt địa chỉ + thu gọn chooser nếu đã có địa chỉ
   khoden_toggleVtp();
   khoden_count();
   // Tự điền SĐT + địa chỉ kho gửi theo kho đang chọn → đơn Viettel báo giá ngay

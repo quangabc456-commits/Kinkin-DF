@@ -330,6 +330,7 @@ def submit_tao_pgh(
     warehouse_id: int = Form(0),  # Kho đến (0 = dùng mặc định)
     note: str = Form(""),
     received_date: str = Form(""),
+    received_date_detail: str = Form(""),   # "Thời gian mong muốn"
     is_draft: bool = Form(False),
     # ----- VTP (tuỳ chọn, tạo đồng thời trong 1 call qua partner*) -----
     delivery_partner_id: int = Form(0),
@@ -427,6 +428,7 @@ def submit_tao_pgh(
         warehouse_id=(warehouse_id or None),
         note=note.strip(),
         received_date=received_date.strip() or None,
+        received_date_detail=received_date_detail.strip(),
         # Tổng cân = tổng cân các kiện F đã tích (giống quản lý: totalWeightPackageF);
         # nếu không đọc được cân kiện thì lùi về cân của dòng sheet.
         total_weight=round(tong_can_kien, 2) or _can_nang_float(ds),
