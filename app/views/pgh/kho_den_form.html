@@ -206,7 +206,7 @@
     {% if loi_kien %}
       <div class="badge err dot">{{ loi_kien }}</div>
     {% elif packages %}
-      <div class="muted" style="margin-bottom:.5rem;">Chỉ tích kiện <strong>đang tồn ở kho đến</strong> (chưa giao).</div>
+      <div class="muted" style="margin-bottom:.5rem;">Chỉ hiển thị kiện F <strong>chưa lên phiếu giao hàng</strong> — kiện đã tạo phiếu được ẩn tự động.</div>
       <div class="table-wrap q-tbl" style="max-height:420px;">
         <table>
           <thead>
@@ -238,7 +238,7 @@
       </div>
       <div class="muted" style="margin-top:.4rem;">Đã chọn <strong id="q-da-chon">0</strong> / {{ packages|length }} kiện.</div>
     {% else %}
-      <div class="badge warn dot">Khách này không có kiện F nào ở kho hiện chọn.</div>
+      <div class="badge warn dot">Khách này không còn kiện F nào chưa lên phiếu (tất cả đã tạo phiếu giao hàng).</div>
     {% endif %}
   </div>
 

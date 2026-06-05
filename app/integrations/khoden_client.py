@@ -389,6 +389,40 @@ def tim_f_theo_thong_tin(body: dict) -> list[dict]:
     return payload or []
 
 
+def ds_kien_f_kha_dung(customer_code: str) -> list[dict]:
+    """Kiện F **CHƯA lên phiếu giao hàng** (khả dụng để chọn) — qua get-packageF-by-information.
+
+    Endpoint này TỰ LỌC: F đã lên phiếu / đã xuất / đang giao / đã giao sẽ KHÔNG trả về
+    (giống F-picker của trang quản lý). Chuẩn hoá field về CÙNG tên với ds_kien_f để template
+    + token + build_body dùng chung, không phải sửa chỗ khác. (codeF=mã F, codeTracking=mã vận
+    đơn, codeKVK=mã kiện K, weight=cân, statusName=trạng thái.)
+    """
+    rows = tim_f_theo_thong_tin(
+        {"customerCode": customer_code, "packageFCode": "", "packageKCode": "",
+         "codeTracking": "", "mawb": ""}
+    )
+    out: list[dict] = []
+    for f in rows:
+        out.append(
+            {
+                "packageFId": f.get("packageFId") or f.get("guid"),
+                "packageFName": f.get("codeF") or f.get("packageFName"),
+                "packageFCode": f.get("codeTracking") or f.get("packageFCode"),
+                "packageFWeight": f.get("weight") if f.get("weight") is not None else f.get("packageFWeight"),
+                "packageKCode": f.get("codeKVK") or f.get("packageKCode"),
+                "mawb": f.get("mawb"),
+                "billClosedDate": f.get("billClosedDate"),
+                "billDate": f.get("billDate"),
+                "customerCode": f.get("customerCode") or customer_code,
+                "packageFStatusName": f.get("statusName") or f.get("packageFStatusName"),
+                "currentPackageFStatus": f.get("currentPackageFStatus"),
+                "orderDetailId": f.get("orderDetailId"),
+                "departureWarehouseName": f.get("departureWarehouseName"),
+            }
+        )
+    return out
+
+
 def tim_k_theo_thong_tin(body: dict) -> list[dict]:
     """POST deliveryorders/get-packageK-by-information → tìm kiện K theo thông tin."""
     data = _post(

@@ -194,7 +194,8 @@ def form_tao_pgh(
         # Các call LIVE độc lập chạy SONG SONG (không đụng DB session) → thời gian ~= 1 call
         # chậm nhất thay vì tổng. Mở trang trống (chưa có khách) thì KHÔNG gọi live nào.
         def _lay_kien():
-            return kc.ds_kien_f(khach.get("code") or code, warehouse_id=cur_warehouse_id)
+            # CHỈ kiện F chưa lên phiếu (endpoint tự lọc bỏ F đã tạo phiếu/đã giao)
+            return kc.ds_kien_f_kha_dung(khach.get("code") or code)
 
         def _lay_doi_tac():
             try:
